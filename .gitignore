@@ -1,0 +1,8 @@
+.env
+external
+db.sqlite3
+media
+static
+venv
+__pycache__
+logs
