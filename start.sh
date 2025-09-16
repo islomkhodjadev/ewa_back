@@ -161,3 +161,4 @@ ${DOCKER_COMPOSE_CMD} -f "${COMPOSE_FILE}" up -d --build
 echo
 echo "Done. Containers started (if compose succeeded)."
 echo "If you mounted the model as a volume in your compose file, ensure the container sees ${MODEL_DIR} at the expected path."
+
