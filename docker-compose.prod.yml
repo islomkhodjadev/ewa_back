@@ -94,7 +94,7 @@ services:
     depends_on: [redis]
     
     ports:
-      - "5555:5555"   # expose Flower UI
+      - "5556:5555"   # expose Flower UI
 volumes:
   db_data:
   redis_data:
