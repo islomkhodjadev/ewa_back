@@ -36,6 +36,7 @@ services:
       - ./static:/app/static
       - ./media:/app/media
       - ./logs:/app/log
+      - ./models:/app/models:ro 
 
   db:
     image: pgvector/pgvector:pg17
@@ -52,6 +53,7 @@ services:
     container_name: ewa_redis
     volumes:
       - redis_data:/data
+       
   # Fast/short tasks (low latency)
   worker-fast:
     build: .
@@ -65,6 +67,8 @@ services:
       --autoscale=12,4
     env_file: .env
     depends_on: [redis]
+    volumes:
+      - ./models:/app/models:ro 
 
   # Heavy tasks isolated
   worker-slow:
@@ -86,13 +90,17 @@ services:
     command: celery -A core beat --loglevel=INFO
     env_file: .env
     depends_on: [redis]
+    volumes:
+      - ./models:/app/models:ro 
 
   flower:
     build: .
     command: celery -A core flower --loglevel=INFO --port=5555
     env_file: .env
     depends_on: [redis]
-    
+    volumes:
+      - ./models:/app/models:ro 
+
     ports:
       - "5556:5555"   # expose Flower UI
 volumes:
