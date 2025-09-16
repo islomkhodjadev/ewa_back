@@ -100,42 +100,34 @@ fi
 
 # Fallback: if weights missing and huggingface_hub is installed, try direct download of just weights
 if [ "${WEIGHT_FOUND}" -eq 0 ]; then
-  if python - <<'PY' >/dev/null 2>&1 <<'PY_EOF'
-import importlib, sys
-try:
-    importlib.import_module('huggingface_hub')
-    sys.exit(0)
-except Exception:
-    sys.exit(1)
-PY_EOF
-  then
+  if python3 -c "import huggingface_hub" >/dev/null 2>&1; then
     echo "Weights not found locally. huggingface_hub available — attempting to download weight file(s) directly (minimal files only)."
-    python - <<'PY'
+    python3 -c "
 from huggingface_hub import hf_hub_download
 import sys, os
 
-repo = "intfloat/multilingual-e5-base"
-target = os.path.join("models","multilingual-e5-base")
+repo = 'intfloat/multilingual-e5-base'
+target = os.path.join('models','multilingual-e5-base')
 os.makedirs(target, exist_ok=True)
 
-candidates = ["model.safetensors","pytorch_model.bin"]
+candidates = ['model.safetensors','pytorch_model.bin']
 for fname in candidates:
     try:
-        print("Downloading", fname)
+        print('Downloading', fname)
         hf_hub_download(repo_id=repo, filename=fname, local_dir=target)
-        print("Downloaded", fname)
+        print('Downloaded', fname)
         sys.exit(0)
     except Exception as e:
-        print("Could not download", fname, ":", e)
+        print('Could not download', fname, ':', e)
 # if here, none succeeded
 sys.exit(2)
-PY
+"
     # re-check
     if [ -f "${MODEL_DIR}/pytorch_model.bin" ] || [ -f "${MODEL_DIR}/model.safetensors" ]; then
       WEIGHT_FOUND=1
     fi
   else
-    echo "huggingface_hub not available. If git-lfs pull failed and you don't want to download full repo, install huggingface_hub (`pip install huggingface_hub`) to allow minimal direct weight downloads."
+    echo "huggingface_hub not available. If git-lfs pull failed and you don't want to download full repo, install huggingface_hub (\`pip install huggingface_hub\`) to allow minimal direct weight downloads."
   fi
 fi
 
@@ -144,7 +136,7 @@ if [ "${WEIGHT_FOUND}" -eq 0 ]; then
   echo "WARNING: model weight not found in ${MODEL_DIR}."
   echo "Expected one of: pytorch_model.bin or model.safetensors"
   echo "You can either:"
-  echo "  - install git-lfs and re-run `git -C ${MODEL_DIR} lfs pull`"
+  echo "  - install git-lfs and re-run \`git -C ${MODEL_DIR} lfs pull\`"
   echo "  - or install huggingface_hub and allow the script to fetch the weight directly"
   echo
   read -p "Continue to docker compose up anyway? [y/N] " yn || true
