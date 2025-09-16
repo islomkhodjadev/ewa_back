@@ -5,7 +5,7 @@ set -euo pipefail
 # - clone HF repo to models/
 # - ensure git-lfs and pull LFS objects (with retries)
 # - verify presence of model weights (pytorch_model.bin or model.safetensors)
-# - start docker compose with docker-compose.prod.yml
+# - start docker compose with docker compose.prod.yml
 
 REPO="https://huggingface.co/intfloat/multilingual-e5-base"
 MODEL_DIR="models/multilingual-e5-base"
@@ -14,7 +14,7 @@ LFS_RETRIES=5
 LFS_SLEEP=10
 
 echo
-echo ">>> start.sh: clone, pull LFS, then docker-compose up"
+echo ">>> start.sh: clone, pull LFS, then docker compose up"
 echo
 
 # helper: check command exists
@@ -33,13 +33,13 @@ if ! _cmd_exists docker; then
   exit 1
 fi
 
-# docker-compose might be v2 plugin 'docker compose'
-if _cmd_exists docker-compose; then
-  DOCKER_COMPOSE_CMD="docker-compose"
+# docker compose might be v2 plugin 'docker compose'
+if _cmd_exists docker compose; then
+  DOCKER_COMPOSE_CMD="docker compose"
 elif docker compose version >/dev/null 2>&1; then
   DOCKER_COMPOSE_CMD="docker compose"
 else
-  echo "ERROR: docker-compose not found. Install docker-compose or use Docker Compose v2." >&2
+  echo "ERROR: docker compose not found. Install docker compose or use Docker Compose v2." >&2
   exit 1
 fi
 
@@ -147,9 +147,9 @@ if [ "${WEIGHT_FOUND}" -eq 0 ]; then
   echo "  - install git-lfs and re-run `git -C ${MODEL_DIR} lfs pull`"
   echo "  - or install huggingface_hub and allow the script to fetch the weight directly"
   echo
-  read -p "Continue to docker-compose up anyway? [y/N] " yn || true
+  read -p "Continue to docker compose up anyway? [y/N] " yn || true
   case "$yn" in
-    [Yy]* ) echo "Proceeding to docker-compose up (but container may fail without weights)";;
+    [Yy]* ) echo "Proceeding to docker compose up (but container may fail without weights)";;
     * ) echo "Aborting."; exit 1;;
   esac
 else
@@ -162,7 +162,7 @@ if [ ! -f "${COMPOSE_FILE}" ]; then
   exit 1
 fi
 
-echo "Starting docker-compose using ${COMPOSE_FILE}..."
+echo "Starting docker compose using ${COMPOSE_FILE}..."
 # Build and start in detached mode
 ${DOCKER_COMPOSE_CMD} -f "${COMPOSE_FILE}" up -d --build
 
