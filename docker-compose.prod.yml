@@ -36,7 +36,7 @@ services:
       - ./static:/app/static
       - ./media:/app/media
       - ./logs:/app/log
-      - ./models:/app/models:ro 
+      - .:/app
 
   db:
     image: pgvector/pgvector:pg17
@@ -53,7 +53,7 @@ services:
     container_name: ewa_redis
     volumes:
       - redis_data:/data
-       
+      
   # Fast/short tasks (low latency)
   worker-fast:
     build: .
@@ -68,8 +68,7 @@ services:
     env_file: .env
     depends_on: [redis]
     volumes:
-      - ./models:/app/models:ro 
-
+      .:/app
   # Heavy tasks isolated
   worker-slow:
     build: .
@@ -91,7 +90,7 @@ services:
     env_file: .env
     depends_on: [redis]
     volumes:
-      - ./models:/app/models:ro 
+      .:/app
 
   flower:
     build: .
@@ -99,10 +98,10 @@ services:
     env_file: .env
     depends_on: [redis]
     volumes:
-      - ./models:/app/models:ro 
+      .:/app
 
     ports:
-      - "5556:5555"   # expose Flower UI
+      - "5555:5555"   # expose Flower UI
 volumes:
   db_data:
   redis_data:
