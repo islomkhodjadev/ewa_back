@@ -68,7 +68,7 @@ services:
     env_file: .env
     depends_on: [redis]
     volumes:
-      .:/app
+      - .:/app
   # Heavy tasks isolated
   worker-slow:
     build: .
@@ -90,7 +90,7 @@ services:
     env_file: .env
     depends_on: [redis]
     volumes:
-      .:/app
+      - .:/app
 
   flower:
     build: .
@@ -98,7 +98,7 @@ services:
     env_file: .env
     depends_on: [redis]
     volumes:
-      .:/app
+      - .:/app
 
     ports:
       - "5555:5555"   # expose Flower UI
