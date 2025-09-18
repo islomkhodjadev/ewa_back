@@ -3,6 +3,8 @@ from django.conf import settings
 from sentence_transformers import SentenceTransformer
 import os
 from pathlib import Path
+import shutil
+from safetensors import SafetensorError  # Import this for specific catching
 
 
 def get_embedding_model():
@@ -16,36 +18,28 @@ def get_embedding_model():
         # Ensure models directory exists
         models_dir.mkdir(exist_ok=True)
 
-        # Quick validation check
-        if not is_model_valid(str(model_path)):
-            print(f"Model not found or invalid at {model_path}, downloading...")
-            # This triggers download to the shared location
-            model_path.mkdir(exist_ok=True)
+        try:
+            # Try to load the model first
+            settings.EMBEDDINGMODEL = SentenceTransformer(str(model_path))
+        except (SafetensorError, Exception) as e:
+            # If any error (corruption or missing), remove and redownload
+            print(f"Error loading model: {e}")
+            print(
+                f"Removing potentially corrupted model at {model_path} and redownloading..."
+            )
 
-        settings.EMBEDDINGMODEL = SentenceTransformer(str(model_path))
+            if model_path.exists():
+                shutil.rmtree(model_path)
+
+            # Redownload fresh model
+            print("Downloading fresh model...")
+            temp_model = SentenceTransformer("intfloat/multilingual-e5-base")
+            model_path.mkdir(parents=True, exist_ok=True)
+            temp_model.save(str(model_path))
+
+            # Load the fresh model
+            settings.EMBEDDINGMODEL = SentenceTransformer(str(model_path))
+
+        print(f"Model loaded successfully from {model_path}")
+
     return settings.EMBEDDINGMODEL
-
-
-def is_model_valid(model_path):
-    """Quick check if model is complete"""
-    model_dir = Path(model_path)
-    if not model_dir.exists():
-        return False
-
-    # Check for essential files
-    essential_files = ["config.json", "tokenizer.json"]
-    for file_name in essential_files:
-        if not (model_dir / file_name).exists():
-            return False
-
-    # Check for model weights
-    weight_files = list(model_dir.glob("*.bin")) + list(model_dir.glob("*.safetensors"))
-    if not weight_files:
-        return False
-
-    # Basic size check (should be > 100MB total)
-    total_size = sum(f.stat().st_size for f in model_dir.rglob("*") if f.is_file())
-    if total_size < 100 * 1024 * 1024:  # Less than 100MB
-        return False
-
-    return True
