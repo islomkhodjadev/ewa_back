@@ -46,6 +46,8 @@ def answer_question(self, prompt, group, session_id):
             group, {"type": "notify", "data": response}
         )
     except Exception as e:
+
+        channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             group,
             {
