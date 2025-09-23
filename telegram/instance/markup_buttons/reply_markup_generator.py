@@ -3,6 +3,8 @@ import aiogram
 from pydantic import BaseModel
 from typing import Optional
 from telegram.models import ButtonTree
+from aiogram.types import WebAppInfo
+from django.conf import settings
 
 
 class ReplyButton(BaseModel):
@@ -43,8 +45,12 @@ async def reply_markup_builder_from_model(
         builder.button(text=button.text)
     if extra_buttons:
         for text in extra_buttons:
+            if text == "Виртуальный помощник":
+                builder.button(text=text, web_app=WebAppInfo(url=settings.MINIAPP_URL))
+                continue
             builder.button(text=text)
     if adjusting:
+
         builder.adjust(*adjusting)
     else:
         builder.adjust(2)

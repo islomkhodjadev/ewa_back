@@ -1,6 +1,6 @@
 # serializers.py
 from rest_framework import serializers
-from rag_system.models import Embedding, EmbeddingData
+from rag_system.models import Embedding, EmbeddingData, Roles
 from django.conf import settings
 
 
@@ -33,3 +33,9 @@ class EmbeddingSerializer(serializers.ModelSerializer):
         # fields = ("id", "raw_text", "embedded_vector", "data")
         fields = ("id", "raw_text", "data")
         read_only_fields = ("id",)
+
+
+class RolesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Roles
+        fields = ("id", "name")

@@ -69,3 +69,66 @@ class EmbeddingAdmin(ModelAdmin):
                 pass
             obj.embedded_vector = vec
         super().save_model(request, obj, form, change)
+
+
+from .models import Utils
+
+
+@admin.register(Utils)
+class UtilsAdmin(ModelAdmin):
+    list_display = (
+        "gpt_model",
+        "is_active",
+        "short_info",
+        "short_rules",
+        "last_message_count",
+    )
+    list_filter = ("is_active",)
+    search_fields = (
+        "gpt_model",
+        "base_information",
+        "base_rules",
+        "last_message_count",
+    )
+    readonly_fields = ()
+    fieldsets = (
+        (
+            "Основная информация",
+            {"fields": ("gpt_model", "is_active", "last_message_count")},
+        ),
+        ("Правила", {"fields": ("base_rules", "choose_embedding_rule")}),
+        ("Базовая информация", {"fields": ("base_information",)}),
+    )
+
+    def short_info(self, obj):
+        return (
+            (obj.base_information[:50] + "...")
+            if len(obj.base_information) > 50
+            else obj.base_information
+        )
+
+    short_info.short_description = "Базовая информация"
+
+    def short_rules(self, obj):
+        return (
+            (obj.base_rules[:50] + "...")
+            if len(obj.base_rules) > 50
+            else obj.base_rules
+        )
+
+    short_rules.short_description = "Правила"
+
+    def save_model(self, request, obj, form, change):
+        """Ensure only one instance is active at a time (also in admin)."""
+        if obj.is_active:
+            Utils.objects.exclude(pk=obj.pk).update(is_active=False)
+        super().save_model(request, obj, form, change)
+
+
+from .models import Roles
+
+
+@admin.register(Roles)
+class RolesAdmin(ModelAdmin):
+    list_display = ("name", "behaviour")
+    search_fields = ("name", "behaviour")

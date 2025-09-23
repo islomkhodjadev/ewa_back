@@ -13,7 +13,6 @@ ENV PIP_RETRIES=10
 COPY ./requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# COPY models/multilingual-e5-base /app/models/multilingual-e5-base
 
 RUN mkdir -p /app/logs
 

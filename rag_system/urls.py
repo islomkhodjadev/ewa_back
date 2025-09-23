@@ -1,4 +1,4 @@
 from django.urls import path
-from rag_system.views import EmbeddingSearch
+from rag_system.views import EmbeddingSearch, GetRolesView
 
-urlpatterns = [path("search/", EmbeddingSearch.as_view())]
+urlpatterns = [path("roles/", GetRolesView.as_view())]

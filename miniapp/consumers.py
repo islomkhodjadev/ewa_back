@@ -6,7 +6,17 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from miniapp.models import ChatSession, Message
 from telegram_client.models import BotClient
 from miniapp.serializers import ChatSessionSerializer
-from rag_system.tasks import answer_question
+from rag_system.tasks import (
+    answer_question,
+    change_mode_to_chat,
+    change_mode_to_skynet,
+    entry_role,
+)
+from django.contrib.postgres.aggregates import ArrayAgg
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class NotificationsConsumer(AsyncJsonWebsocketConsumer):
@@ -59,7 +69,7 @@ class NotificationsConsumer(AsyncJsonWebsocketConsumer):
 
     async def connect(self):
         chat_id = self.scope["url_route"]["kwargs"].get("user_id")
-        print(chat_id, "comming hereeee############")
+
         if not chat_id:
             await self.close(code=4000)
             return
@@ -76,18 +86,34 @@ class NotificationsConsumer(AsyncJsonWebsocketConsumer):
         await self.accept()
 
         data = await self._get_session_serialized(self.chat_session_id)
+
         if data:
             await self.send_json(data)
 
     async def receive_json(self, content, **kwargs):
         prompt = content.get("prompt") or ""
-        await self._create_message(self.chat_session_id, prompt, owner="user")
 
-        # kick off your background task (uses stored IDs/group)
+        logger.info(prompt)
+        await self._create_message(self.chat_session_id, prompt, owner="user")
         group = self.group
-        res = answer_question.delay(
-            prompt=prompt, group=group, session_id=self.chat_session_id
-        )
+        if prompt == "/ЧАТ":
+            res = change_mode_to_chat.delay(
+                prompt=prompt, group=group, session_id=self.chat_session_id
+            )
+        # kick off your background task (uses stored IDs/group)
+        elif prompt == "/Тренажер":
+            res = change_mode_to_skynet.delay(
+                prompt=prompt, group=group, session_id=self.chat_session_id
+            )
+        elif "role_id" in content:
+            res = entry_role.delay(
+                prompt, group, self.chat_session_id, content.get("role_id")
+            )
+        else:
+            res = answer_question.delay(
+                prompt=prompt, group=group, session_id=self.chat_session_id
+            )
+
         await self.send_json({"status": "accepted", "task_id": res.id})
 
     async def notify(self, event):

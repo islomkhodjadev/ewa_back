@@ -171,9 +171,20 @@ UNFOLD = {
                 "collapsible": True,
                 "items": [
                     {
-                        "title": _("Встраивания"),
+                        "title": _("Эмбеддинг"),
                         "icon": "scatter_plot",  # можешь выбрать подходящий Material icon
                         "link": reverse_lazy("admin:rag_system_embedding_changelist"),
+                    },
+                    {
+                        "title": _("Утилиты"),  # твоя модель
+                        "icon": "build",  # можно выбрать другой Material icon
+                        "link": reverse_lazy("admin:rag_system_utils_changelist"),
+                        # заменяй app_label на имя твоего приложения
+                    },
+                    {
+                        "title": _("Роли"),
+                        "icon": "group",
+                        "link": reverse_lazy("admin:rag_system_roles_changelist"),
                     },
                 ],
             },

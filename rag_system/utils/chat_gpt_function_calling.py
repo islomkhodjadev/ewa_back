@@ -2,8 +2,11 @@ from django.conf import settings
 import json
 from openai import AsyncOpenAI, OpenAI
 from rag_system.models import Embedding
-from rag_system.utils import gpt_rules
+from .gpt_rules import get_utils, get_utils_async
+
 from typing import Optional, Dict
+from rag_system.models import Utils
+from miniapp.models import ChatSession
 
 client_async = AsyncOpenAI(api_key=settings.GPT_TOKEN)
 client_sync = OpenAI(api_key=settings.GPT_TOKEN)
@@ -12,17 +15,17 @@ tools = [
     {
         "type": "function",
         "name": "provide_id_and_answer",
-        "description": "Get id for exact information from which i give files",
+        "description": "Provide answer and ID of the source content if used, otherwise use -1",
         "parameters": {
             "type": "object",
             "properties": {
                 "id": {
                     "type": "integer",
-                    "description": "id of the  file which i should retrieve files or media files to give user",
+                    "description": "ID of the source content used for the answer. Use -1 if no specific content was used.",
                 },
                 "answer": {
                     "type": "string",
-                    "description": "text format of the answer for the request from the sources given",
+                    "description": "Text answer for the user's request",
                 },
             },
             "required": ["id", "answer"],
@@ -34,56 +37,69 @@ tools = [
 
 
 async def get_answer_gpt_function_async(
-    user_prompt: str, contents: Embedding
+    user_prompt: str, contents: Embedding, session_object: ChatSession
 ) -> Optional[Dict]:
-
+    utils: Utils = await get_utils_async()
+    inputs = await session_object.get_history_async(utils.last_message_count)
     response = await client_async.responses.create(
-        model="gpt-4.1-nano",
+        model=utils.gpt_model,
         input=[
             {
                 "role": "system",
                 "content": f"""
-                {gpt_rules}
-                you are "EWA Assistant AI" by EWA PRODUCT
-                here you should give the id and answer from these contents for user request
-                {', '.join(f'id: {embedding.id}; content: {embedding.raw_text}' for embedding in contents)}""",
+                {utils.base_rules}
+                {utils.base_information}
+                {utils.choose_embedding_rule}
+                
+                AVAILABLE CONTENT WITH IDs:
+                {' | '.join(f'id: {embedding.id}; content: {embedding.raw_text}' for embedding in contents)}
+                HERE ENDS CONTENT WITH IDs.
+                
+                
+                
+                """,
             },
-            {
-                "role": "user",
-                "content": user_prompt,
-            },
+            *inputs,
         ],
         tools=tools,
         tool_choice={"type": "function", "name": "provide_id_and_answer"},
     )
     for item in response.output:
         if hasattr(item, "arguments"):
+            print(item.arguments)
             return item.arguments
+
     return None
 
 
-def get_answer_gpt_function(user_prompt: str, contents: Embedding) -> Optional[Dict]:
-
+def get_answer_gpt_function(
+    user_prompt: str, contents: Embedding, session_object: ChatSession
+) -> Optional[Dict]:
+    utils: Utils = get_utils()
+    inputs = session_object.get_history(utils.last_message_count)
     response = client_sync.responses.create(
-        model="gpt-4.1-nano",
+        model=utils.gpt_model,
         input=[
             {
                 "role": "system",
                 "content": f"""
-                {gpt_rules}
-                you are "EWA Assistant AI" by EWA PRODUCT
-                here you should give the id and answer from these contents for user request
-                {', '.join(f'id: {embedding.id}; content: {embedding.raw_text}' for embedding in contents)}""",
+                {utils.base_rules}
+                {utils.base_information}
+                {utils.choose_embedding_rule}
+                
+                AVAILABLE CONTENT WITH IDs:
+                {' | '.join(f'id: {embedding.id}; content: {embedding.raw_text}' for embedding in contents)}
+                HERE ENDS CONTENT WITH IDs.
+                
+                
+                
+                """,
             },
-            {
-                "role": "user",
-                "content": user_prompt,
-            },
+            *inputs,
         ],
         tools=tools,
         tool_choice={"type": "function", "name": "provide_id_and_answer"},
     )
-
     for item in response.output:
         if hasattr(item, "arguments"):
             return item.arguments

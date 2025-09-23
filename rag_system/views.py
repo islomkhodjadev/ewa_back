@@ -4,7 +4,9 @@ from django.shortcuts import render
 
 from rest_framework import views
 from rag_system.utils.search import search_documents
-from rag_system.serializers import EmbeddingSerializer
+from rag_system.serializers import EmbeddingSerializer, RolesSerializer
+from rest_framework.views import APIView, Response
+from rag_system.models import Roles
 
 
 class EmbeddingSearch(views.APIView):
@@ -23,3 +25,11 @@ class EmbeddingSearch(views.APIView):
             data=EmbeddingSerializer(data, many=True).data,
             status=views.status.HTTP_200_OK,
         )
+
+
+class GetRolesView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        roles = Roles.objects.all()
+
+        return Response(data=RolesSerializer(roles, many=True).data)

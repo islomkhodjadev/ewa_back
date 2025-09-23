@@ -170,7 +170,7 @@ LOGGING = {
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 BOT_HOST = os.getenv("BOT_HOST", BACKEND_ORIGIN)  # e.g., https://apiewa.divspan.uz
 BOT_WEBHOOK_URL = f"{BOT_HOST}/telegram/webhook/{BOT_TOKEN.split(':', 1)[0]}/updates/"
-
+MINIAPP_URL = os.getenv("MINIAPP_URL", "")
 # GPT config
 GPT_TOKEN = os.getenv("gpt_token", "")
 
@@ -198,14 +198,18 @@ CELERY_WORKER_DISABLE_RATE_LIMITS = True  # minor overhead reduction
 CELERY_TASK_IGNORE_RESULT = True  # global default; override per-task if needed
 CELERY_RESULT_EXPIRES = 3600  # 1h if you do keep results
 
+# In your settings.py
+
 # Routing & queues
-CELERY_TASK_QUEUES = {
-    "default": {},
-    "fast": {},
-    "slow": {},
+CELERY_TASK_ROUTES = {
+    # Fast queue - all your chat tasks
+    "rag_system.tasks.answer_question": {"queue": "fast"},
+    "rag_system.tasks.change_mode_to_skynet": {"queue": "fast"},
+    "rag_system.tasks.change_mode_to_chat": {"queue": "fast"},
+    "rag_system.tasks.entry_role": {"queue": "fast"},
 }
 
-CELERY_TASK_ROUTES = {
-    # Quick, latency-sensitive jobs
-    "rag_system.tasks.answer_question": {"queue": "fast"},
+CELERY_TASK_QUEUES = {
+    "fast": {},
+    "default": {},
 }
