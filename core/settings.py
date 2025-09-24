@@ -21,6 +21,7 @@ CORS_ALLOWED_ORIGINS = csv_env("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
 
 # Hosts without scheme
 ALLOWED_HOSTS = csv_env("ALLOWED_HOSTS", "127.0.0.1,localhost")
+SECURE_SSL_REDIRECT = True
 
 CSRF_TRUSTED_ORIGINS = csv_env(
     "CSRF_TRUSTED_ORIGINS", BACKEND_ORIGIN  # ensure this includes scheme
