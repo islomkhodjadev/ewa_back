@@ -1,18 +1,18 @@
 server {
     listen 80;
-    server_name apiewa.divspan.uz;
+    server_name admin-helper.ewaproduct.com;
 
     # increase if you upload large files
-    client_max_body_size 300m;
+    client_max_body_size 1G;
 
     location /static/ {
-        alias /back/ewa_bot/static/;   
+        alias /app/ewa_back/static/;   
         access_log off;
         expires 30d;
     }
 
     location /media/ {
-        alias /back/ewa_bot/media/;    
+        alias /app/ewa_back/media/;    
         access_log off;
         expires 30d;
     }
