@@ -78,7 +78,7 @@ class AttachmentDataAdmin(ModelAdmin):
         "attachment__button__text",
         "attachment__text",
     )
-    fields = ("attachment", "source")
+    fields = ("attachment", "thumbnail", "source")
 
     def ext(self, obj):
         import os

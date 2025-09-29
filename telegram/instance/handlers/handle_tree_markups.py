@@ -7,6 +7,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 from telegram.instance.filters.tree_filter import TreeButtonsOnly
 from telegram.instance.middlewares import BotClientSessionMiddleWare
+from telegram.models.buttonTree import AttachmentData
 from telegram_client.models import BotClientSession, BotClient
 from telegram.models import ButtonTree
 from telegram.instance.markup_buttons import reply_markup_builder_from_model
@@ -180,6 +181,8 @@ tree_router.message.register(
     TreeButtonsOnly(),
     flags={"block": False},  # <— важно!
 )
+
+
 # --- helpers/attachments.py ---------------------------------------------------
 from typing import Optional
 
@@ -200,7 +203,7 @@ PHOTO_MAX_BYTES = 10 * 1024 * 1024
 async def send_full_attachment(
     message: types.Message,
     attachment,
-    bot,
+    bot: Bot,
     buttons: Optional[types.ReplyKeyboardMarkup] = None,
     fallback_text: Optional[str] = None,
 ):
@@ -230,7 +233,9 @@ async def send_full_attachment(
         return
 
     # Collect files
-    files = [data_item async for data_item in attachment.data.all()]
+    files: list[AttachmentData] = [
+        data_item async for data_item in attachment.data.all()
+    ]
 
     # FILE: caption the *last* document if possible; else send text once, then documents
     if attachment.source_type == attachment.FILE:
@@ -277,9 +282,14 @@ async def send_full_attachment(
                         caption=cap if use_caption else None,
                     )
             else:
+                thumbnail = None
+                if item.thumbnail:
+                    thumbnail = FSInputFile(item.thumbnail.path)
+
                 await bot.send_video(
                     chat_id=message.chat.id,
                     video=media,
+                    thumbnail=thumbnail,
                     caption=cap if use_caption else None,
                 )
 
@@ -311,7 +321,16 @@ async def send_full_attachment(
                         chat_id=message.chat.id, photo=media, caption=cap
                     )
             elif ext in VIDEO_EXTS:
-                await bot.send_video(chat_id=message.chat.id, video=media, caption=cap)
+                thumbnail = None
+                if item.thumbnail:
+                    thumbnail = FSInputFile(single.thumbnail.path)
+
+                await bot.send_video(
+                    chat_id=message.chat.id,
+                    thumbnail=thumbnail,
+                    video=media,
+                    caption=cap,
+                )
             else:
                 await bot.send_document(chat_id=message.chat.id, document=media)
 
@@ -357,8 +376,13 @@ async def send_full_attachment(
                         if use_cap_here:
                             caption_available = False
                 elif ext in VIDEO_EXTS:
+                    thumbnail = None
+                    if item.thumbnail:
+                        thumbnail = FSInputFile(item.thumbnail.path)
+
                     mg.add_video(
                         media=FSInputFile(path),
+                        thumbnail=thumbnail,
                         caption=caption_value if use_cap_here else None,
                     )
                     if use_cap_here:
@@ -379,9 +403,15 @@ async def send_full_attachment(
                         caption=getattr(single, "caption", None),
                     )
                 elif single.type == "video":
+
+                    thumbnail = None
+                    if item.thumbnail:
+                        thumbnail = FSInputFile(single.thumbnail.path)
+
                     await bot.send_video(
                         chat_id=message.chat.id,
                         video=single.media,
+                        thumbnail=thumbnail,
                         caption=getattr(single, "caption", None),
                     )
 
