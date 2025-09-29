@@ -11,7 +11,7 @@ def csv_env(name, default=""):
 
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-insecure-key")
-DEBUG = int(os.getenv("DEBUG", 1))
+DEBUG = int(os.getenv("DEBUG", 0))
 
 # Backend public host including scheme for CSRF (e.g., https://apiewa.divspan.uz)
 BACKEND_ORIGIN = os.getenv("BACKEND_ORIGIN", "http://127.0.0.1:8000")
