@@ -182,7 +182,6 @@ tree_router.message.register(
     flags={"block": False},  # <— важно!
 )
 
-
 # --- helpers/attachments.py ---------------------------------------------------
 from typing import Optional
 
@@ -193,6 +192,7 @@ import os
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
+FILE_EXTS = set()  # All other extensions are considered files
 TELEGRAM_MEDIA_GROUP_LIMIT = 10  # chunk size (max group size)
 TELEGRAM_CAPTION_LIMIT = 1024  # practical caption limit for photo/video
 PHOTO_MAX_BYTES = 10 * 1024 * 1024
@@ -255,6 +255,123 @@ async def send_full_attachment(
                     document=FSInputFile(path),
                 )
         if base_text and not cap:
+            await message.answer(base_text, reply_markup=buttons)
+        return
+
+    # VIDEO_IMAGE_FILE: send files separately at the top, then media (images/videos) as media group
+    if attachment.source_type == attachment.VIDEO_IMAGE_FILE:
+        if not files:
+            if base_text:
+                return await message.answer(base_text, reply_markup=buttons)
+            return
+
+        cap = caption_or_none(base_text)
+        caption_available = cap is not None
+
+        # Separate files from media
+        file_items = []
+        media_items = []
+
+        for item in files:
+            path = item.source.path
+            ext = os.path.splitext(path)[1].lower()
+            if ext in IMAGE_EXTS or ext in VIDEO_EXTS:
+                media_items.append(item)
+            else:
+                file_items.append(item)
+
+        # Step 1: Send all files first
+        if file_items:
+            for idx, item in enumerate(file_items):
+                path = item.source.path
+                is_last_file = (idx == len(file_items) - 1) and not media_items
+                use_cap_here = is_last_file and caption_available
+
+                await bot.send_document(
+                    chat_id=message.chat.id,
+                    document=FSInputFile(path),
+                    caption=cap if use_cap_here else None,
+                )
+                if use_cap_here:
+                    caption_available = False
+
+        # Step 2: Send media items (images/videos) as media groups
+        if media_items:
+            total_media = len(media_items)
+
+            for start in range(0, total_media, TELEGRAM_MEDIA_GROUP_LIMIT):
+                chunk = media_items[start : start + TELEGRAM_MEDIA_GROUP_LIMIT]
+                mg = MediaGroupBuilder()
+
+                for i, item in enumerate(chunk):
+                    path = item.source.path
+                    ext = os.path.splitext(path)[1].lower()
+                    global_idx = start + i
+                    is_global_last = (global_idx == total_media - 1) and not file_items
+
+                    use_cap_here = is_global_last and caption_available
+
+                    if ext in IMAGE_EXTS:
+                        size = os.path.getsize(path)
+                        if size > PHOTO_MAX_BYTES:
+                            # Too big for photo: send as document
+                            await bot.send_document(
+                                chat_id=message.chat.id,
+                                document=FSInputFile(path),
+                                caption=cap if use_cap_here else None,
+                            )
+                            if use_cap_here:
+                                caption_available = False
+                        else:
+                            mg.add_photo(
+                                media=FSInputFile(path),
+                                caption=cap if use_cap_here else None,
+                            )
+                            if use_cap_here:
+                                caption_available = False
+                    elif ext in VIDEO_EXTS:
+                        thumbnail = None
+                        if item.thumbnail:
+                            thumbnail = FSInputFile(item.thumbnail.path)
+
+                        mg.add_video(
+                            media=FSInputFile(path),
+                            thumbnail=thumbnail,
+                            caption=cap if use_cap_here else None,
+                        )
+                        if use_cap_here:
+                            caption_available = False
+
+                group = mg.build()
+                if len(group) >= 2:
+                    await bot.send_media_group(chat_id=message.chat.id, media=group)
+                elif len(group) == 1:
+                    # Send the single leftover group item directly
+                    single = group[0]
+                    if single.type == "photo":
+                        await bot.send_photo(
+                            chat_id=message.chat.id,
+                            photo=single.media,
+                            caption=getattr(single, "caption", None),
+                        )
+                    elif single.type == "video":
+                        # Get thumbnail for single video
+                        item_idx = start  # Since we're processing one item from chunk
+                        if item_idx < len(media_items):
+                            current_item = media_items[item_idx]
+                            thumbnail = None
+                            if current_item.thumbnail:
+                                thumbnail = FSInputFile(current_item.thumbnail.path)
+
+                        await bot.send_video(
+                            chat_id=message.chat.id,
+                            video=single.media,
+                            thumbnail=thumbnail,
+                            caption=getattr(single, "caption", None),
+                        )
+
+        # Step 3: If caption wasn't used and we have text, send it separately
+        if base_text and caption_available:
             await message.answer(base_text, reply_markup=buttons)
         return
 
@@ -322,7 +439,7 @@ async def send_full_attachment(
                     )
             elif ext in VIDEO_EXTS:
                 thumbnail = None
-                if item.thumbnail:
+                if single.thumbnail:
                     thumbnail = FSInputFile(single.thumbnail.path)
 
                 await bot.send_video(
@@ -403,10 +520,13 @@ async def send_full_attachment(
                         caption=getattr(single, "caption", None),
                     )
                 elif single.type == "video":
-
-                    thumbnail = None
-                    if item.thumbnail:
-                        thumbnail = FSInputFile(single.thumbnail.path)
+                    # Get thumbnail for single video
+                    item_idx = start  # Since we're processing one item from chunk
+                    if item_idx < len(files):
+                        current_item = files[item_idx]
+                        thumbnail = None
+                        if current_item.thumbnail:
+                            thumbnail = FSInputFile(current_item.thumbnail.path)
 
                     await bot.send_video(
                         chat_id=message.chat.id,
