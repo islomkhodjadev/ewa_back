@@ -36,7 +36,7 @@ class AttachmentToButton(models.Model):
         related_name="attachment",
         verbose_name="Кнопка",
     )
-    text = models.TextField(verbose_name="Текст вложения")
+    text = models.TextField(verbose_name="Текст вложения", blank=True, null=True)
     TEXT = "text"
     FILE = "file"
     VIDEO = "video"
