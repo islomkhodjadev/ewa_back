@@ -9,7 +9,7 @@ from .models import ButtonTree, AttachmentToButton, AttachmentData
 class AttachmentDataInline(TabularInline):
     model = AttachmentData
     extra = 0
-    fields = ("source",)
+    fields = ("source", "thumbnail")
     show_change_link = True
 
 
