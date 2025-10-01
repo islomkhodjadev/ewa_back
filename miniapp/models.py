@@ -13,16 +13,32 @@ class ChatSession(models.Model):
     mode_types = ((CHAT, "chat"), (SKYNET, "skynet"))
 
     bot_client = models.OneToOneField(
-        BotClient, on_delete=models.CASCADE, related_name="chatsession", unique=True
+        BotClient,
+        on_delete=models.CASCADE,
+        related_name="chatsession",
+        unique=True,
+        verbose_name="Бот-клиент",
     )
 
-    mode = models.CharField(choices=mode_types, max_length=6, default=CHAT)
+    mode = models.CharField(
+        choices=mode_types, max_length=6, default=CHAT, verbose_name="Режим работы"
+    )
+
     current_role = models.ForeignKey(
-        Roles, on_delete=models.SET_DEFAULT, default=None, null=True, blank=True
+        Roles,
+        on_delete=models.SET_DEFAULT,
+        default=None,
+        null=True,
+        blank=True,
+        verbose_name="Текущая роль",
     )
 
     def __str__(self):
         return f"ChatSession #{self.pk} – {self.bot_client}"
+
+    class Meta:
+        verbose_name = "Сессия чата"
+        verbose_name_plural = "Сессии чатов"
 
     @database_sync_to_async
     def get_history_async(self, message_count: int):
@@ -132,16 +148,33 @@ class Message(models.Model):
     )
 
     session = models.ForeignKey(
-        ChatSession, on_delete=models.CASCADE, related_name="messages"  # plural
+        ChatSession,
+        on_delete=models.CASCADE,
+        related_name="messages",  # plural
+        verbose_name="Сессия чата",
     )
-    summarize_start = models.BooleanField(default=False)
-    summarize_end = models.BooleanField(default=False)
-    message = models.TextField()
+    summarize_start = models.BooleanField(
+        default=False, verbose_name="Начало суммаризации"
+    )
+    summarize_end = models.BooleanField(
+        default=False, verbose_name="Конец суммаризации"
+    )
+    message = models.TextField(verbose_name="Текст сообщения")
     embedding = models.ForeignKey(
-        Embedding, on_delete=models.SET_NULL, null=True, blank=True
+        Embedding,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Эмбеддинг",
     )
-    owner = models.CharField(choices=OWNER_CHOICES, max_length=6)
-    created_at = models.DateTimeField(auto_now_add=True)
+    owner = models.CharField(
+        choices=OWNER_CHOICES, max_length=6, verbose_name="Отправитель"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
 
     def __str__(self):
         return f"[{self.owner}] {self.message[:40]}..."
+
+    class Meta:
+        verbose_name = "Сообщение"
+        verbose_name_plural = "Сообщения"

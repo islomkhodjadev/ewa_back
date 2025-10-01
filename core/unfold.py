@@ -11,7 +11,7 @@ UNFOLD = {
         {
             "icon": "diamond",
             "title": _("Ewa Бот"),
-            "link": "https://t.me/ewa_bot",
+            "link": "https://t.me/ewahelpertestbot",
         },
     ],
     "SHOW_HISTORY": True,
@@ -89,12 +89,12 @@ UNFOLD = {
         "show_all_applications": False,
         "navigation": [
             {
-                "title": _("Навигация"),
+                "title": "🧭 Навигация",
                 "separator": False,
                 "collapsible": False,
                 "items": [
                     {
-                        "title": _("Панель управления"),
+                        "title": "📊 Панель управления",
                         "icon": "dashboard",
                         "link": reverse_lazy("admin:index"),
                         "permission": lambda request: request.user.is_superuser,
@@ -102,19 +102,19 @@ UNFOLD = {
                 ],
             },
             {
-                "title": _("Профили"),
+                "title": "👥 Профили",
                 "separator": True,
                 "collapsible": True,
                 "items": [
                     {
-                        "title": _("Профили"),
+                        "title": "👤 Профили",
                         "icon": "person",
                         "link": reverse_lazy(
                             "admin:telegram_client_botclient_changelist"
                         ),
                     },
                     {
-                        "title": _("Сессия клиента бота"),
+                        "title": "💬 Сессия клиента бота",
                         "icon": "person",
                         "link": reverse_lazy(
                             "admin:telegram_client_botclientsession_changelist"
@@ -123,69 +123,69 @@ UNFOLD = {
                 ],
             },
             {
-                "title": _("Сессии чата"),
+                "title": "💭 Сессии чата",
                 "separator": True,
                 "collapsible": True,
                 "items": [
                     {
-                        "title": _("Сессии"),
+                        "title": "💬 Сессии",
                         "icon": "chat",
                         "link": reverse_lazy("admin:miniapp_chatsession_changelist"),
                     },
                     {
-                        "title": _("Сообщения"),
+                        "title": "💌 Сообщения",
                         "icon": "forum",
                         "link": reverse_lazy("admin:miniapp_message_changelist"),
                     },
                 ],
             },
             {
-                "title": _("Дерево кнопок"),
+                "title": "🌳 Дерево кнопок",
                 "separator": True,
                 "collapsible": True,
                 "items": [
                     {
-                        "title": _("Кнопки"),
+                        "title": "🔘 Кнопки",
                         "icon": "account_tree",
                         "link": reverse_lazy("admin:telegram_buttontree_changelist"),
                     },
                     {
-                        "title": _("Материалы кнопок"),
+                        "title": "📎 Материалы кнопок",
                         "icon": "attach_file",
                         "link": reverse_lazy(
                             "admin:telegram_attachmenttobutton_changelist"
                         ),
                     },
                     {
-                        "title": _("Файлы материалов"),
+                        "title": "📁 Файлы материалов",
                         "icon": "folder",
                         "link": reverse_lazy(
-                            "admin:telegram_attachmentdata_changelist"  # ⚠️ у модели опечатка в названии
+                            "admin:telegram_attachmentdata_changelist"
                         ),
                     },
                 ],
             },
             {
-                "title": _("BAD Тест"),
+                "title": "💊 BAD Тест",
                 "separator": True,
                 "collapsible": True,
                 "items": [
                     {
-                        "title": _("Вопросы теста"),
+                        "title": "❓ Вопросы теста",
                         "icon": "quiz",
                         "link": reverse_lazy(
                             "admin:telegram_badtestquestion_changelist"
                         ),
                     },
                     {
-                        "title": _("Продукты БАД"),
+                        "title": "💊 Продукты БАД",
                         "icon": "medication",
                         "link": reverse_lazy(
                             "admin:telegram_badtestproduct_changelist"
                         ),
                     },
                     {
-                        "title": _("Сессии тестирования"),
+                        "title": "📋 Сессии тестирования",
                         "icon": "history",
                         "link": reverse_lazy(
                             "admin:telegram_badtestsession_changelist"
@@ -194,23 +194,22 @@ UNFOLD = {
                 ],
             },
             {
-                "title": _("RAG система"),
+                "title": "🧠 RAG система",
                 "separator": True,
                 "collapsible": True,
                 "items": [
                     {
-                        "title": _("Эмбеддинг"),
-                        "icon": "scatter_plot",  # можешь выбрать подходящий Material icon
+                        "title": "📊 Эмбеддинг",
+                        "icon": "scatter_plot",
                         "link": reverse_lazy("admin:rag_system_embedding_changelist"),
                     },
                     {
-                        "title": _("Утилиты"),  # твоя модель
-                        "icon": "build",  # можно выбрать другой Material icon
+                        "title": "🛠️ Утилиты",
+                        "icon": "build",
                         "link": reverse_lazy("admin:rag_system_utils_changelist"),
-                        # заменяй app_label на имя твоего приложения
                     },
                     {
-                        "title": _("Роли"),
+                        "title": "🎭 Роли",
                         "icon": "group",
                         "link": reverse_lazy("admin:rag_system_roles_changelist"),
                     },
