@@ -117,7 +117,9 @@ async def handle_goals_selection(message: types.Message, state: FSMContext):
         session.current_question = first_question
         await session.asave()
 
-        answers = await first_question.answers.all().order_by("order")
+        answers = [
+            answer async for answer in first_question.answers.all().order_by("order")
+        ]
         keyboard_buttons = [
             [KeyboardButton(text=answer.answer_text)] for answer in answers
         ]
@@ -178,7 +180,9 @@ async def handle_question_answer(message: types.Message, state: FSMContext):
         session.current_question = next_question
         await session.asave()
 
-        answers = await next_question.answers.all().order_by("order")
+        answers = [
+            answer async for answer in next_question.answers.all().order_by("order")
+        ]
         keyboard_buttons = [
             [KeyboardButton(text=answer.answer_text)] for answer in answers
         ]
@@ -202,15 +206,21 @@ async def show_test_results(
     sorted_categories = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     top_categories = [cat for cat, score in sorted_categories[:3]]
 
-    # Get primary products
-    primary_products = await BadTestProduct.objects.filter(
-        category__in=top_categories, priority="primary", is_active=True
-    ).alist()
+    # Get primary products - FIXED: Use list comprehension with async for
+    primary_products = [
+        product
+        async for product in BadTestProduct.objects.filter(
+            category__in=top_categories, priority="primary", is_active=True
+        )
+    ]
 
-    # Get secondary products
-    secondary_products = await BadTestProduct.objects.filter(
-        category__in=top_categories, priority="secondary", is_active=True
-    ).alist()
+    # Get secondary products - FIXED: Use list comprehension with async for
+    secondary_products = [
+        product
+        async for product in BadTestProduct.objects.filter(
+            category__in=top_categories, priority="secondary", is_active=True
+        )
+    ]
 
     # Store results in session
     session.answers_data["primary_products"] = [p.name for p in primary_products]
@@ -222,6 +232,10 @@ async def show_test_results(
     await session.asave()
 
     # Show results
+    primary_products_text = "\n".join(
+        [f"{p.name} - {p.dosage}" for p in primary_products]
+    )
+
     result_text = f"""
 Готово! Тест пройден и вот, что мы выяснили:
 
@@ -236,7 +250,7 @@ async def show_test_results(
 3. {primary_products[2].name if len(primary_products) > 2 else 'N/A'}
 
 Как принимать?
-{chr(10).join(f'{p.name} - {p.dosage}' for p in primary_products)}
+{primary_products_text}
 
 Напиши "Давай!" - и я выдам тебе бонусную must have тройку "а почему я не пил(а) это раньше?"
 
@@ -267,6 +281,13 @@ async def handle_bonus_request(message: types.Message, state: FSMContext):
     secondary_products = session.answers_data.get("secondary_products", [])
     product_details = session.answers_data.get("product_details", {})
 
+    bonus_products_text = "\n".join(
+        [
+            f'{product} - {product_details.get(product, "Информация о дозировке")}'
+            for product in secondary_products[:3]
+        ]
+    )
+
     bonus_text = f"""
 Бонусная must have тройка:
 
@@ -275,7 +296,7 @@ async def handle_bonus_request(message: types.Message, state: FSMContext):
 3. {secondary_products[2] if len(secondary_products) > 2 else 'N/A'}
 
 Как принимать?
-{chr(10).join(f'{product} - {product_details.get(product, "Информация о дозировке")}' for product in secondary_products[:3])}
+{bonus_products_text}
 
 Отправь "Хочу рекомендации" чтобы получить полный список всех 6 продуктов!
     """.strip()
@@ -289,19 +310,32 @@ async def handle_full_recommendations(message: types.Message, state: FSMContext)
     data = await state.get_data()
     session = await BadTestSession.objects.aget(id=data["session_id"])
 
-    all_products = session.answers_data.get(
-        "primary_products", []
-    ) + session.answers_data.get("secondary_products", [])
+    primary_products = session.answers_data.get("primary_products", [])
+    secondary_products = session.answers_data.get("secondary_products", [])
     product_details = session.answers_data.get("product_details", {})
+
+    primary_text = "\n".join(
+        [
+            f'• {product} - {product_details.get(product, "Информация о дозировке")}'
+            for product in primary_products
+        ]
+    )
+
+    secondary_text = "\n".join(
+        [
+            f'• {product} - {product_details.get(product, "Информация о дозировке")}'
+            for product in secondary_products
+        ]
+    )
 
     recommendations_text = f"""
 Полный список рекомендованных БАДов:
 
 Основные продукты:
-{chr(10).join(f'• {product} - {product_details.get(product, "Информация о дозировке")}' for product in session.answers_data.get('primary_products', []))}
+{primary_text}
 
 Бонусные продукты:
-{chr(10).join(f'• {product} - {product_details.get(product, "Информация о дозировке")}' for product in session.answers_data.get('secondary_products', []))}
+{secondary_text}
 
 Спасибо за прохождение теста! 🎉
     """.strip()
@@ -330,7 +364,9 @@ async def handle_back_in_test(message: types.Message, state: FSMContext):
             session.current_question = prev_question
             await session.asave()
 
-            answers = await prev_question.answers.all().order_by("order")
+            answers = [
+                answer async for answer in prev_question.answers.all().order_by("order")
+            ]
             keyboard_buttons = [
                 [KeyboardButton(text=answer.answer_text)] for answer in answers
             ]
