@@ -387,8 +387,16 @@ async def handle_back_in_test(message: types.Message, state: FSMContext):
         await state.clear()
 
 
-# Cancel test
-@bad_test_router.message(F.text == "⬅️ Назад")
+@bad_test_router.message(
+    F.text == "⬅️ Назад",
+    StateFilter(
+        BadTestStates.waiting_for_goals,
+        BadTestStates.answering_questions,
+        BadTestStates.showing_results,
+        BadTestStates.waiting_for_bonus,
+        BadTestStates.waiting_for_recommendations,
+    ),
+)
 async def cancel_test(message: types.Message, state: FSMContext):
     await give_parent_tree(message, message.bot, from_back=True)
     await state.clear()
