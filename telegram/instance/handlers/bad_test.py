@@ -31,14 +31,13 @@ class BadTestStates(StatesGroup):
 @bad_test_router.message(F.text == "Подобрать БАД - тест")
 async def start_bad_test(message: types.Message, state: FSMContext, client: BotClient):
     # Get existing incomplete session or create new one
-    existing_session = await BadTestSession.objects.filter(
-        client=client, is_completed=False
-    ).afirst()
+    existing_session = await BadTestSession.objects.filter(client=client).afirst()
 
     if existing_session:
         # Reset existing session
         session = existing_session
         session.answers_data = {}
+        session.is_completed = False
         session.current_question = None
         await session.asave()
     else:
