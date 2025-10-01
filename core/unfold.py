@@ -3,8 +3,8 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
 UNFOLD = {
-    "SITE_TITLE": "КУДА?",
-    "SITE_HEADER": "КУДА?",
+    "SITE_TITLE": "Ewa Helper",
+    "SITE_HEADER": "Ewa Helper",
     "SITE_URL": "/",
     "SITE_SYMBOL": "person",
     "SITE_DROPDOWN": [
