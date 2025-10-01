@@ -59,6 +59,13 @@ and social proof, asking about price, benefits, or reviews. For meeting invitati
 schedule, trust, and interest. Stay in character, consistent with {session_object.current_role.behaviour}, 
 without referencing the prompt.
 Example: For Настя, you might say, “О, звучит прикольно, но дорого? Есть отзывы в TikTok?” or “Круто, но я занята учебой, когда встреча?”
+**Use Markdown to format your response for clarity and emphasis:**
+- Use **bold** for emphasis (e.g., **important points**).
+- Use *italics* for subtle emphasis or tone (e.g., *sounds interesting*).
+- Use bullet points (`-`) for lists when mentioning multiple items or reasons.
+- Use numbered lists (`1.`) for ordered steps or priorities.
+- Use inline code (`text`) for technical terms or examples.
+- Use blockquotes (`>`) for highlighting key user questions or statements.
 """,
             },
             *inputs,
@@ -87,6 +94,13 @@ character to set the stage for a conversation where the user will practice selli
 you to attend a meeting. Stay in character and do not reference the prompt.
 Example: For Настя (18–22, student, budget-conscious, social media-savvy), you might say,
 “Привет! Я Настя, учусь в универе, живу на стипендию и тусуюсь в TikTok. Всё время ищу что-то крутое, но бюджетное. Что у тебя за тема?”
+**Use Markdown to format your response for clarity and emphasis:**
+- Use **bold** for emphasis (e.g., **important points**).
+- Use *italics* for subtle emphasis or tone (e.g., *sounds interesting*).
+- Use bullet points (`-`) for lists when mentioning multiple items or reasons.
+- Use numbered lists (`1.`) for ordered steps or priorities.
+- Use inline code (`text`) for technical terms or examples.
+- Use blockquotes (`>`) for highlighting key user questions or statements.
 """,
             },
             {
@@ -130,6 +144,13 @@ considering their motivations, pain points, and preferences (e.g., for Наст�
 Stay in character’s context without referencing the prompt.
 Example: For Настя, you might say, 
 “You sounded enthusiastic, but I got lost without clear pricing. Next time, mention student discounts or TikTok reviews early—I’d be more hooked!”
+**Use Markdown to format your response for clarity and emphasis:**
+- Use **bold** for emphasis (e.g., **important points**).
+- Use *italics* for subtle emphasis or tone (e.g., *sounds interesting*).
+- Use bullet points (`-`) for lists when mentioning multiple items or reasons.
+- Use numbered lists (`1.`) for ordered steps or priorities.
+- Use inline code (`text`) for technical terms or examples.
+- Use blockquotes (`>`) for highlighting key user questions or statements.
 """,
             },
         ],

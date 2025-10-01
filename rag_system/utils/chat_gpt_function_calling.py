@@ -83,16 +83,19 @@ def get_answer_gpt_function(
             {
                 "role": "system",
                 "content": f"""
+                **Use Markdown to format your response for clarity and emphasis:**
+- Use **bold** for emphasis (e.g., **important points**).
+- Use *italics* for subtle emphasis or tone (e.g., *sounds interesting*).
+- Use bullet points (`-`) for lists when mentioning multiple items or reasons.
+- Use numbered lists (`1.`) for ordered steps or priorities.
+- Use inline code (`text`) for technical terms or examples.
+- Use blockquotes (`>`) for highlighting key user questions or statements.
                 {utils.base_rules}
                 {utils.base_information}
                 {utils.choose_embedding_rule}
-                
                 AVAILABLE CONTENT WITH IDs:
                 {' | '.join(f'id: {embedding.id}; content: {embedding.raw_text}' for embedding in contents)}
                 HERE ENDS CONTENT WITH IDs.
-                
-                
-                
                 """,
             },
             *inputs,
