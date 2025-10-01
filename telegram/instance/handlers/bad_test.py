@@ -82,7 +82,7 @@ async def start_bad_test(message: types.Message, state: FSMContext, client: BotC
         keyboard=[
             [KeyboardButton(text="1,3,5"), KeyboardButton(text="2,4,6")],
             [KeyboardButton(text="1,2,3"), KeyboardButton(text="4,5,6")],
-            [KeyboardButton(text="⬅️Назад")],
+            [KeyboardButton(text="⬅️ Назад")],
         ],
     )
 
@@ -133,7 +133,7 @@ async def handle_goals_selection(message: types.Message, state: FSMContext):
         keyboard_buttons = [
             [KeyboardButton(text=answer.answer_text)] for answer in answers
         ]
-        keyboard_buttons.append([KeyboardButton(text="⬅️Назад")])
+        keyboard_buttons.append([KeyboardButton(text="⬅️ Назад")])
 
         keyboard = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=keyboard_buttons)
 
@@ -147,7 +147,7 @@ async def handle_goals_selection(message: types.Message, state: FSMContext):
 # Handle question answers
 @bad_test_router.message(BadTestStates.answering_questions)
 async def handle_question_answer(message: types.Message, state: FSMContext):
-    if message.text == "⬅️Назад":
+    if message.text == "⬅️ Назад":
         # Handle back navigation
         await handle_back_in_test(message, state)
         return
@@ -196,7 +196,7 @@ async def handle_question_answer(message: types.Message, state: FSMContext):
         keyboard_buttons = [
             [KeyboardButton(text=answer.answer_text)] for answer in answers
         ]
-        keyboard_buttons.append([KeyboardButton(text="⬅️Назад")])
+        keyboard_buttons.append([KeyboardButton(text="⬅️ Назад")])
 
         keyboard = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=keyboard_buttons)
 
@@ -274,7 +274,7 @@ async def show_test_results(
         resize_keyboard=True,
         keyboard=[
             [KeyboardButton(text="Давай!"), KeyboardButton(text="Хочу рекомендации")],
-            [KeyboardButton(text="⬅️Назад")],
+            [KeyboardButton(text="⬅️ Назад")],
         ],
     )
 
@@ -355,44 +355,63 @@ async def handle_full_recommendations(message: types.Message, state: FSMContext)
 
 # Handle back navigation in test
 async def handle_back_in_test(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    session = await BadTestSession.objects.select_related("current_question").aget(
-        id=data["session_id"]
-    )
+    try:
+        data = await state.get_data()
+        session_id = data.get("session_id")
 
-    if session.current_question:
-        # Go to previous question
-        prev_question = (
-            await BadTestQuestion.objects.filter(
-                is_active=True, order__lt=session.current_question.order
-            )
-            .order_by("-order")
-            .afirst()
+        if not session_id:
+            # If no session ID, go directly to main menu
+            await give_parent_tree(message, message.bot, from_back=True)
+            await state.clear()
+            return
+
+        session = await BadTestSession.objects.select_related("current_question").aget(
+            id=session_id
         )
 
-        if prev_question:
-            session.current_question = prev_question
-            await session.asave()
-
-            answers = [
-                answer async for answer in prev_question.answers.all().order_by("order")
-            ]
-            keyboard_buttons = [
-                [KeyboardButton(text=answer.answer_text)] for answer in answers
-            ]
-            keyboard_buttons.append([KeyboardButton(text="⬅️Назад")])
-
-            keyboard = ReplyKeyboardMarkup(
-                resize_keyboard=True, keyboard=keyboard_buttons
+        if session.current_question:
+            # Go to previous question
+            prev_question = (
+                await BadTestQuestion.objects.filter(
+                    is_active=True, order__lt=session.current_question.order
+                )
+                .order_by("-order")
+                .afirst()
             )
 
-            await message.answer(prev_question.question_text, reply_markup=keyboard)
-            await state.update_data(current_question_id=prev_question.id)
+            if prev_question:
+                session.current_question = prev_question
+                await session.asave()
+
+                answers = [
+                    answer
+                    async for answer in prev_question.answers.all().order_by("order")
+                ]
+                keyboard_buttons = [
+                    [KeyboardButton(text=answer.answer_text)] for answer in answers
+                ]
+                keyboard_buttons.append([KeyboardButton(text="⬅️ Назад")])
+
+                keyboard = ReplyKeyboardMarkup(
+                    resize_keyboard=True, keyboard=keyboard_buttons
+                )
+
+                await message.answer(prev_question.question_text, reply_markup=keyboard)
+                await state.update_data(current_question_id=prev_question.id)
+            else:
+                # Back to goals selection - FIX: Use proper async call
+                from telegram_client.models import BotClient
+
+                client = await BotClient.objects.aget(chat_id=message.from_user.id)
+                await start_bad_test(message, state, client)
         else:
-            # Back to goals selection
-            await start_bad_test(message, state, session.client)
-    else:
-        # Back to main menu
+            # Back to main menu
+            await give_parent_tree(message, message.bot, from_back=True)
+            await state.clear()
+
+    except Exception as e:
+        # If any error occurs, fallback to main menu
+        logger.error(f"Error in handle_back_in_test: {e}")
         await give_parent_tree(message, message.bot, from_back=True)
         await state.clear()
 
@@ -404,7 +423,7 @@ logger = logging.getLogger(__name__)
 
 
 @bad_test_router.message(
-    F.text == "⬅️Назад",
+    F.text == "⬅️ Назад",
     StateFilter(
         BadTestStates.waiting_for_goals,
         BadTestStates.answering_questions,
@@ -414,6 +433,6 @@ logger = logging.getLogger(__name__)
     ),
 )
 async def cancel_test(message: types.Message, state: FSMContext):
-    logger.info("HERE FROM CANCEL TEST WORKIG")
+    logger.info("HERE FROM CANCEL TEST")
     await give_parent_tree(message, message.bot, from_back=True)
     await state.clear()
