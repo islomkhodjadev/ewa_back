@@ -28,14 +28,24 @@ class BadTestStates(StatesGroup):
     waiting_for_recommendations = State()
 
 
-# Start BAD Test
 @bad_test_router.message(F.text == "Подобрать БАД - тест")
 async def start_bad_test(message: types.Message, state: FSMContext, client: BotClient):
-    # Create or get test session
-    session, created = await BadTestSession.objects.aget_or_create(
-        client=client, is_completed=False, defaults={"answers_data": {}}
-    )
+    # Get existing incomplete session or create new one
+    existing_session = await BadTestSession.objects.filter(
+        client=client, is_completed=False
+    ).afirst()
 
+    if existing_session:
+        # Reset existing session
+        session = existing_session
+        session.answers_data = {}
+        session.current_question = None
+        await session.asave()
+    else:
+        # Create new session
+        session = await BadTestSession.objects.acreate(
+            client=client, is_completed=False, answers_data={}
+        )
     # Welcome message
     welcome_text = """
 О, ты здесь! Я почти как врач, только без халата, диплома и занудства.
