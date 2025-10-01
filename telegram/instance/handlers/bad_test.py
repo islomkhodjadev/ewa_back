@@ -397,6 +397,12 @@ async def handle_back_in_test(message: types.Message, state: FSMContext):
         await state.clear()
 
 
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
 @bad_test_router.message(
     F.text == "⬅️ Назад",
     StateFilter(
@@ -408,5 +414,6 @@ async def handle_back_in_test(message: types.Message, state: FSMContext):
     ),
 )
 async def cancel_test(message: types.Message, state: FSMContext):
+    logger.info("HERE FROM CANCEL TEST WORKIG")
     await give_parent_tree(message, message.bot, from_back=True)
     await state.clear()

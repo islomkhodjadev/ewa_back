@@ -11,6 +11,9 @@ from telegram.models.buttonTree import AttachmentData
 from telegram_client.models import BotClientSession, BotClient
 from telegram.models import ButtonTree
 from telegram.instance.markup_buttons import reply_markup_builder_from_model
+import logging
+
+logger = logging.getLogger(__name__)
 
 tree_router = Router()
 tree_router.message.outer_middleware(BotClientSessionMiddleWare())
@@ -27,6 +30,7 @@ def back_keyboard() -> ReplyKeyboardMarkup:
 
 
 async def give_parent_tree(message: types.Message, bot: Bot, from_back: bool = False):
+    logger.info("HERE IN GIVE TREE START")
     buttons_tree = ButtonTree.objects.filter(parent=None)
     buttons = await reply_markup_builder_from_model(
         buttons_tree,
