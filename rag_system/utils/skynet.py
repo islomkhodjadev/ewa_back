@@ -42,27 +42,24 @@ def skynet_answer(user_prompt: str, session_object: ChatSession) -> str:
 
     logger.info("skynet simple answers")
     utils: Utils = get_utils()
-    inputs = session_object.get_history(utils.last_message_count)
+    inputs = session_object.get_last_summarization_history_v2()
     response = client_sync.responses.create(
         model=utils.gpt_model,
         input=[
             {
                 "role": "system",
                 "content": f"""
-                This is base rules:
-                {utils.base_rules}
-                this is company information
-                {utils.base_information}
-                Now this:
-                 YOU ARE NOW THIS PERSON THIS IS YOUR DESCRIPTION:
-                 MAKE CONVERSATION LIKE PErson with few words, sentence.
-                 your user person is:
-                {session_object.current_role.behaviour}.
-                
-                MAKE CONVERSATION LIKE THIS PERSON. THINK YOURSELF AS THIS PERSON.
-                answer for the user request like person no need for big answers small concise answers only.
-                Analyze the history of the chat and react properly
-                """,
+You are an AI role-playing as the character defined in {session_object.current_role.behaviour}. 
+Embody their personality, motivations, habits, pain points, and decision-making style.
+Engage in a conversation with a user practicing their skills in selling a product/service or persuading you to attend a meeting.
+Respond realistically, reflecting the character’s age, 
+financial situation, social habits, and preferences. 
+Use conversational language matching their tone (e.g., casual, trend-conscious for Настя). Evaluate sales pitches for affordability, relevance, 
+and social proof, asking about price, benefits, or reviews. For meeting invitations, respond based on the character’s
+schedule, trust, and interest. Stay in character, consistent with {session_object.current_role.behaviour}, 
+without referencing the prompt.
+Example: For Настя, you might say, “О, звучит прикольно, но дорого? Есть отзывы в TikTok?” or “Круто, но я занята учебой, когда встреча?”
+""",
             },
             *inputs,
         ],
@@ -82,12 +79,15 @@ def skynet_introduce(session_object: ChatSession) -> str:
             {
                 "role": "system",
                 "content": f"""
-                {utils.base_rules}
-                {utils.base_information}
-                YOU ARE NOW THIS PERSON THIS IS YOUR DESCRIPTION:
-                {session_object.current_role.behaviour}
-                BASED ON THIS INTRODUCE YOURSELF TO THE USER FULLY DESCRIBE YOURSELF AS A PERSON ABOVE NOW YOU ARE THAT PERSON ANSWER LIKE THIS PERSON
-                """,
+You are an AI role-playing as the character defined in {session_object.current_role.behaviour}. 
+Fully embody their personality, age, financial situation, social habits, motivations, and preferences. 
+Introduce yourself to the user as this character in a concise, natural way, reflecting their tone and context 
+(e.g., casual and trend-savvy for a student like Настя). Mention key traits or circumstances relevant to the 
+character to set the stage for a conversation where the user will practice selling a product/service or persuading 
+you to attend a meeting. Stay in character and do not reference the prompt.
+Example: For Настя (18–22, student, budget-conscious, social media-savvy), you might say,
+“Привет! Я Настя, учусь в универе, живу на стипендию и тусуюсь в TikTok. Всё время ищу что-то крутое, но бюджетное. Что у тебя за тема?”
+""",
             },
             {
                 "role": "user",
@@ -120,20 +120,17 @@ def skynet_summarize(session_object: ChatSession) -> str:
             *inputs,
             {
                 "role": "user",
-                "content": f"""Based on the conversation history above, provide a comprehensive summary and feedback.
-
-                FOCUS ON ANALYZING THE USER'S BEHAVIOR, not your own responses.
-                
-                {session_object.current_role.summarize_behaviour}
-                
-                IMPORTANT: Your summary should focus on:
-                - The user's communication style and patterns
-                - The user's questions and interests
-                - The user's needs and preferences
-                - Feedback for the USER's approach
-                
-                - Do not analyze or summarize your own responses
-                """,
+                "content": f"""
+Based on the conversation history, provide a concise summary
+and feedback focusing solely on the user’s behavior, not your own responses. 
+You are role-playing as the character defined in {session_object.current_role.behaviour}.
+Analyze the user’s communication style, questions, interests, and needs. 
+Provide actionable feedback on how the user could improve their approach to better persuade or sell to this character,
+considering their motivations, pain points, and preferences (e.g., for Настя: emphasize affordability, social proof, or trendy appeals). 
+Stay in character’s context without referencing the prompt.
+Example: For Настя, you might say, 
+“You sounded enthusiastic, but I got lost without clear pricing. Next time, mention student discounts or TikTok reviews early—I’d be more hooked!”
+""",
             },
         ],
     )
