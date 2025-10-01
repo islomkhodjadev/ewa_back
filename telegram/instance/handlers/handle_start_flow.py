@@ -33,8 +33,8 @@ async def start(message: types.Message, bot: Bot, state: context.FSMContext) -> 
     await state.set_state(LoginFSM.access_parameter)
 
     await message.answer(
-        "Добро пожаловать, для продолжения работы нужно авторизоваться \n "
-        "Пожалуйста, отправьте логин, который вы указывали прирегистрации на сайте https://ewaproduct.com/ru"
+        "Добро пожаловать, для продолжения работы нужно авторизоваться \n"
+        "Пожалуйста, отправьте логин, который вы указывали при регистрации на сайте https://ewaproduct.com/ru"
     )
     await message.delete()
 
