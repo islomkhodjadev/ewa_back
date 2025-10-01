@@ -77,7 +77,9 @@ async def use_tree(
             children_qs,
             extra_buttons=[BACK_BTN],
         )
-        return await message.answer(parent.text, reply_markup=buttons)
+        return await message.answer(
+            parent.text, reply_markup=buttons, parse_mode=ParseMode.HTML
+        )
 
     # 2) User is at root and selects a top-level node
     if session.current_button is None:
@@ -101,7 +103,11 @@ async def use_tree(
                     buttons=back_keyboard(),
                     fallback_text=next_button.text,  # use button text if attachment.text missing
                 )
-            return await message.answer(next_button.text, reply_markup=back_keyboard())
+            return await message.answer(
+                next_button.text,
+                reply_markup=back_keyboard(),
+                parse_mode=ParseMode.HTML,
+            )
 
         # Non-leaf: advance and render children keyboard (+ Back)
         session.current_button = next_button
@@ -122,10 +128,18 @@ async def use_tree(
                 fallback_text=next_button.text,  # used only if attachment.text is empty
             )
             # ...and THEN ALWAYS show child buttons so user can navigate right away
-            return await message.answer(next_button.text, reply_markup=buttons)
+            return await message.answer(
+                next_button.text,
+                reply_markup=buttons,
+                parse_mode=ParseMode.HTML,
+            )
 
         # No attachment → just show node title + children
-        return await message.answer(next_button.text, reply_markup=buttons)
+        return await message.answer(
+            next_button.text,
+            reply_markup=buttons,
+            parse_mode=ParseMode.HTML,
+        )
 
     # 3) User is traversing deeper
     if session.current_button is not None:
@@ -150,7 +164,11 @@ async def use_tree(
                     buttons=back_keyboard(),
                     fallback_text=next_button.text,
                 )
-            return await message.answer(next_button.text, reply_markup=back_keyboard())
+            return await message.answer(
+                next_button.text,
+                reply_markup=back_keyboard(),
+                parse_mode=ParseMode.HTML,
+            )
 
         # Non-leaf: advance and render children keyboard (+ Back)
         session.current_button = next_button
@@ -170,9 +188,17 @@ async def use_tree(
                 fallback_text=next_button.text,
             )
             # ...and THEN ALWAYS show child buttons
-            return await message.answer(next_button.text, reply_markup=buttons)
+            return await message.answer(
+                next_button.text,
+                reply_markup=buttons,
+                parse_mode=ParseMode.HTML,
+            )
 
-        return await message.answer(next_button.text, reply_markup=buttons)
+        return await message.answer(
+            next_button.text,
+            reply_markup=buttons,
+            parse_mode=ParseMode.HTML,
+        )
 
 
 # Register handler
@@ -229,7 +255,11 @@ async def send_full_attachment(
     # TEXT-only case
     if attachment.source_type == attachment.TEXT:
         if base_text:
-            return await message.answer(base_text, reply_markup=buttons)
+            return await message.answer(
+                base_text,
+                reply_markup=buttons,
+                parse_mode=ParseMode.HTML,
+            )
         return
 
     # Collect files
@@ -255,14 +285,22 @@ async def send_full_attachment(
                     document=FSInputFile(path),
                 )
         if base_text and not cap:
-            await message.answer(base_text, reply_markup=buttons)
+            await message.answer(
+                base_text,
+                reply_markup=buttons,
+                parse_mode=ParseMode.HTML,
+            )
         return
 
     # VIDEO_IMAGE_FILE: send files separately at the top, then media (images/videos) as media group
     if attachment.source_type == attachment.VIDEO_IMAGE_FILE:
         if not files:
             if base_text:
-                return await message.answer(base_text, reply_markup=buttons)
+                return await message.answer(
+                    base_text,
+                    reply_markup=buttons,
+                    parse_mode=ParseMode.HTML,
+                )
             return
 
         cap = caption_or_none(base_text)
@@ -372,7 +410,11 @@ async def send_full_attachment(
 
         # Step 3: If caption wasn't used and we have text, send it separately
         if base_text and caption_available:
-            await message.answer(base_text, reply_markup=buttons)
+            await message.answer(
+                base_text,
+                reply_markup=buttons,
+                parse_mode=ParseMode.HTML,
+            )
         return
 
     # IMAGE or VIDEO (homogeneous)
@@ -411,14 +453,22 @@ async def send_full_attachment(
                 )
 
         if base_text and cap is None:
-            await message.answer(base_text, reply_markup=buttons)
+            await message.answer(
+                base_text,
+                reply_markup=buttons,
+                parse_mode=ParseMode.HTML,
+            )
         return
 
     # VIDEO_IMAGE (mixed images/videos)
     if attachment.source_type == attachment.VIDEO_IMAGE:
         if not files:
             if base_text:
-                return await message.answer(base_text, reply_markup=buttons)
+                return await message.answer(
+                    base_text,
+                    reply_markup=buttons,
+                    parse_mode=ParseMode.HTML,
+                )
             return
 
         # Single file: caption on that (last) file if it fits; handle big photos
@@ -452,7 +502,11 @@ async def send_full_attachment(
                 await bot.send_document(chat_id=message.chat.id, document=media)
 
             if base_text and cap is None:
-                await message.answer(base_text, reply_markup=buttons)
+                await message.answer(
+                    base_text,
+                    reply_markup=buttons,
+                    parse_mode=ParseMode.HTML,
+                )
             return
 
         # Multiple files: caption on the *global last* item (even if it must be a document)
@@ -548,9 +602,17 @@ async def send_full_attachment(
                 caption_available = False
 
         if base_text and caption_value is None:
-            await message.answer(base_text, reply_markup=buttons)
+            await message.answer(
+                base_text,
+                reply_markup=buttons,
+                parse_mode=ParseMode.HTML,
+            )
         return
 
     # Fallback: nothing matched — just send text if present
     if base_text:
-        await message.answer(base_text, reply_markup=buttons)
+        await message.answer(
+            base_text,
+            reply_markup=buttons,
+            parse_mode=ParseMode.HTML,
+        )
