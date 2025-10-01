@@ -6,5 +6,5 @@ static
 venv
 __pycache__
 logs
-models
+model
 celerybeat-schedule
