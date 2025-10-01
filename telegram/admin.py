@@ -149,3 +149,127 @@ class AttachmentDataAdmin(ModelAdmin):
         return obj.source.name
 
     source_name.short_description = "Файл"
+
+
+# --- admin.py ---
+from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
+from unfold.admin import ModelAdmin
+from unfold.admin import StackedInline
+
+from telegram.models.bad_test import (
+    BadTestQuestion,
+    BadTestAnswer,
+    BadTestProduct,
+    BadTestSession,
+)
+
+
+class BadTestAnswerInline(StackedInline):
+    model = BadTestAnswer
+    extra = 1
+    fields = [
+        "answer_text",
+        "order",
+        "points_beauty",
+        "points_weight_loss",
+        "points_energy",
+        "points_brain",
+        "points_edema",
+        "points_stress",
+        "points_joints",
+    ]
+    ordering = ["order"]
+
+
+@admin.register(BadTestQuestion)
+class BadTestQuestionAdmin(ModelAdmin):
+    list_display = ["question_text", "order", "is_active", "answers_count"]
+    list_editable = ["order", "is_active"]
+    list_filter = ["is_active"]
+    search_fields = ["question_text"]
+    ordering = ["order"]
+    inlines = [BadTestAnswerInline]
+
+    fieldsets = ((None, {"fields": ("question_text", "order", "is_active")}),)
+
+    def answers_count(self, obj):
+        return obj.answers.count()
+
+    answers_count.short_description = _("Количество ответов")
+
+
+@admin.register(BadTestProduct)
+class BadTestProductAdmin(ModelAdmin):
+    list_display = [
+        "name",
+        "category_display",
+        "priority_display",
+        "dosage_preview",
+        "is_active",
+    ]
+    list_editable = ["is_active"]
+    list_filter = ["category", "priority", "is_active"]
+    search_fields = ["name", "description"]
+
+    fieldsets = (
+        (
+            _("Основная информация"),
+            {"fields": ("name", "category", "priority", "is_active")},
+        ),
+        (
+            _("Описание и дозировка"),
+            {"fields": ("description", "dosage"), "classes": ("wide",)},
+        ),
+    )
+
+    def category_display(self, obj):
+        return obj.get_category_display()
+
+    category_display.short_description = _("Категория")
+
+    def priority_display(self, obj):
+        return obj.get_priority_display()
+
+    priority_display.short_description = _("Приоритет")
+
+    def dosage_preview(self, obj):
+        return obj.dosage[:50] + "..." if len(obj.dosage) > 50 else obj.dosage
+
+    dosage_preview.short_description = _("Дозировка")
+
+
+@admin.register(BadTestSession)
+class BadTestSessionAdmin(ModelAdmin):
+    list_display = [
+        "client",
+        "current_question",
+        "is_completed",
+        "created_at",
+        "updated_at",
+    ]
+    list_filter = ["is_completed", "created_at"]
+    readonly_fields = ["created_at", "updated_at", "answers_data_preview"]
+    search_fields = ["client__username", "client__first_name"]
+
+    fieldsets = (
+        (
+            _("Основная информация"),
+            {"fields": ("client", "current_question", "is_completed")},
+        ),
+        (
+            _("Данные ответов"),
+            {"fields": ("answers_data_preview",), "classes": ("collapse",)},
+        ),
+        (
+            _("Временные метки"),
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
+    )
+
+    def answers_data_preview(self, obj):
+        import json
+
+        return json.dumps(obj.answers_data, ensure_ascii=False, indent=2)
+
+    answers_data_preview.short_description = _("Данные ответов (JSON)")

@@ -30,7 +30,11 @@ async def give_parent_tree(message: types.Message, bot: Bot, from_back: bool = F
     buttons_tree = ButtonTree.objects.filter(parent=None)
     buttons = await reply_markup_builder_from_model(
         buttons_tree,
-        extra_buttons=["Виртуальный помощник", "Личный кабинет"],
+        extra_buttons=[
+            "Подобрать БАД - тест",
+            "Виртуальный помощник",
+            "Личный кабинет",
+        ],
         adjusting=[2, 2],
     )
 

@@ -166,6 +166,34 @@ UNFOLD = {
                 ],
             },
             {
+                "title": _("BAD Тест"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Вопросы теста"),
+                        "icon": "quiz",
+                        "link": reverse_lazy(
+                            "admin:telegram_badtestquestion_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Продукты БАД"),
+                        "icon": "medication",
+                        "link": reverse_lazy(
+                            "admin:telegram_badtestproduct_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Сессии тестирования"),
+                        "icon": "history",
+                        "link": reverse_lazy(
+                            "admin:telegram_badtestsession_changelist"
+                        ),
+                    },
+                ],
+            },
+            {
                 "title": _("RAG система"),
                 "separator": True,
                 "collapsible": True,

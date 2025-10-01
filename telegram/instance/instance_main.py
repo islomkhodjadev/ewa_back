@@ -9,6 +9,7 @@ webhook_dp = Dispatcher()
 webhook_dp.include_routers(
     handlers.start_flow_router,
     handlers.profile_router,
+    handlers.bad_test_router,
     handlers.tree_router,
 )
 
