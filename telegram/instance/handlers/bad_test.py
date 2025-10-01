@@ -82,7 +82,7 @@ async def start_bad_test(message: types.Message, state: FSMContext, client: BotC
         keyboard=[
             [KeyboardButton(text="1,3,5"), KeyboardButton(text="2,4,6")],
             [KeyboardButton(text="1,2,3"), KeyboardButton(text="4,5,6")],
-            [KeyboardButton(text="⬅️ Назад")],
+            [KeyboardButton(text="⬅️Назад")],
         ],
     )
 
@@ -133,7 +133,7 @@ async def handle_goals_selection(message: types.Message, state: FSMContext):
         keyboard_buttons = [
             [KeyboardButton(text=answer.answer_text)] for answer in answers
         ]
-        keyboard_buttons.append([KeyboardButton(text="⬅️ Назад")])
+        keyboard_buttons.append([KeyboardButton(text="⬅️Назад")])
 
         keyboard = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=keyboard_buttons)
 
@@ -147,7 +147,7 @@ async def handle_goals_selection(message: types.Message, state: FSMContext):
 # Handle question answers
 @bad_test_router.message(BadTestStates.answering_questions)
 async def handle_question_answer(message: types.Message, state: FSMContext):
-    if message.text == "⬅️ Назад":
+    if message.text == "⬅️Назад":
         # Handle back navigation
         await handle_back_in_test(message, state)
         return
@@ -196,7 +196,7 @@ async def handle_question_answer(message: types.Message, state: FSMContext):
         keyboard_buttons = [
             [KeyboardButton(text=answer.answer_text)] for answer in answers
         ]
-        keyboard_buttons.append([KeyboardButton(text="⬅️ Назад")])
+        keyboard_buttons.append([KeyboardButton(text="⬅️Назад")])
 
         keyboard = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=keyboard_buttons)
 
@@ -274,7 +274,7 @@ async def show_test_results(
         resize_keyboard=True,
         keyboard=[
             [KeyboardButton(text="Давай!"), KeyboardButton(text="Хочу рекомендации")],
-            [KeyboardButton(text="⬅️ Назад")],
+            [KeyboardButton(text="⬅️Назад")],
         ],
     )
 
@@ -380,7 +380,7 @@ async def handle_back_in_test(message: types.Message, state: FSMContext):
             keyboard_buttons = [
                 [KeyboardButton(text=answer.answer_text)] for answer in answers
             ]
-            keyboard_buttons.append([KeyboardButton(text="⬅️ Назад")])
+            keyboard_buttons.append([KeyboardButton(text="⬅️Назад")])
 
             keyboard = ReplyKeyboardMarkup(
                 resize_keyboard=True, keyboard=keyboard_buttons
@@ -404,7 +404,7 @@ logger = logging.getLogger(__name__)
 
 
 @bad_test_router.message(
-    F.text == "⬅️ Назад",
+    F.text == "⬅️Назад",
     StateFilter(
         BadTestStates.waiting_for_goals,
         BadTestStates.answering_questions,
