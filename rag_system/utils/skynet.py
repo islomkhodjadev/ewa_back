@@ -49,16 +49,7 @@ def skynet_answer(user_prompt: str, session_object: ChatSession) -> str:
             {
                 "role": "system",
                 "content": f"""
-You are an AI role-playing as the character defined in {session_object.current_role.behaviour}. 
-Embody their personality, motivations, habits, pain points, and decision-making style.
-Engage in a conversation with a user practicing their skills in selling a product/service or persuading you to attend a meeting.
-Respond realistically, reflecting the character’s age, 
-financial situation, social habits, and preferences. 
-Use conversational language matching their tone (e.g., casual, trend-conscious for Настя). Evaluate sales pitches for affordability, relevance, 
-and social proof, asking about price, benefits, or reviews. For meeting invitations, respond based on the character’s
-schedule, trust, and interest. Stay in character, consistent with {session_object.current_role.behaviour}, 
-without referencing the prompt.
-Example: For Настя, you might say, “О, звучит прикольно, но дорого? Есть отзывы в TikTok?” or “Круто, но я занята учебой, когда встреча?”
+
 **Use Markdown to format your response for clarity and emphasis:**
 - Use **bold** for emphasis (e.g., **important points**).
 - Use *italics* for subtle emphasis or tone (e.g., *sounds interesting*).
@@ -66,6 +57,9 @@ Example: For Настя, you might say, “О, звучит прикольно, 
 - Use numbered lists (`1.`) for ordered steps or priorities.
 - Use inline code (`text`) for technical terms or examples.
 - Use blockquotes (`>`) for highlighting key user questions or statements.
+{session_object.current_role.behaviour}
+{session_object.current_role.portret}
+
 """,
             },
             *inputs,
@@ -78,42 +72,42 @@ Example: For Настя, you might say, “О, звучит прикольно, 
 
 
 def skynet_introduce(session_object: ChatSession) -> str:
-    utils: Utils = get_utils()
-    logger.info("skynet introduction")
-    response = client_sync.responses.create(
-        model=utils.gpt_model,
-        input=[
-            {
-                "role": "system",
-                "content": f"""
-You are an AI role-playing as the character defined in {session_object.current_role.behaviour}. 
-Fully embody their personality, age, financial situation, social habits, motivations, and preferences. 
-Introduce yourself to the user as this character in a concise, natural way, reflecting their tone and context 
-(e.g., casual and trend-savvy for a student like Настя). Mention key traits or circumstances relevant to the 
-character to set the stage for a conversation where the user will practice selling a product/service or persuading 
-you to attend a meeting. Stay in character and do not reference the prompt.
-Example: For Настя (18–22, student, budget-conscious, social media-savvy), you might say,
-“Привет! Я Настя, учусь в универе, живу на стипендию и тусуюсь в TikTok. Всё время ищу что-то крутое, но бюджетное. Что у тебя за тема?”
-**Use Markdown to format your response for clarity and emphasis:**
-- Use **bold** for emphasis (e.g., **important points**).
-- Use *italics* for subtle emphasis or tone (e.g., *sounds interesting*).
-- Use bullet points (`-`) for lists when mentioning multiple items or reasons.
-- Use numbered lists (`1.`) for ordered steps or priorities.
-- Use inline code (`text`) for technical terms or examples.
-- Use blockquotes (`>`) for highlighting key user questions or statements.
-""",
-            },
-            {
-                "role": "user",
-                "content": f"USER INFO: {session_object.bot_client.first_name} {session_object.bot_client.last_name}",
-            },
-        ],
-    )
-    logger.info(response)
-    for item in response.output:
-        if hasattr(item, "content") and item.content:
-            return item.content[0].text
-    return None
+    #     utils: Utils = get_utils()
+    #     logger.info("skynet introduction")
+    #     response = client_sync.responses.create(
+    #         model=utils.gpt_model,
+    #         input=[
+    #             {
+    #                 "role": "system",
+    #                 "content": f"""
+    # You are an AI role-playing as the character defined in {session_object.current_role.behaviour}.
+    # Fully embody their personality, age, financial situation, social habits, motivations, and preferences.
+    # Introduce yourself to the user as this character in a concise, natural way, reflecting their tone and context
+    # (e.g., casual and trend-savvy for a student like Настя). Mention key traits or circumstances relevant to the
+    # character to set the stage for a conversation where the user will practice selling a product/service or persuading
+    # you to attend a meeting. Stay in character and do not reference the prompt.
+    # Example: For Настя (18–22, student, budget-conscious, social media-savvy), you might say,
+    # “Привет! Я Настя, учусь в универе, живу на стипендию и тусуюсь в TikTok. Всё время ищу что-то крутое, но бюджетное. Что у тебя за тема?”
+    # **Use Markdown to format your response for clarity and emphasis:**
+    # - Use **bold** for emphasis (e.g., **important points**).
+    # - Use *italics* for subtle emphasis or tone (e.g., *sounds interesting*).
+    # - Use bullet points (`-`) for lists when mentioning multiple items or reasons.
+    # - Use numbered lists (`1.`) for ordered steps or priorities.
+    # - Use inline code (`text`) for technical terms or examples.
+    # - Use blockquotes (`>`) for highlighting key user questions or statements.
+    # """,
+    #             },
+    #             {
+    #                 "role": "user",
+    #                 "content": f"USER INFO: {session_object.bot_client.first_name} {session_object.bot_client.last_name}",
+    #             },
+    #         ],
+    #     )
+    #     logger.info(response)
+    #     for item in response.output:
+    #         if hasattr(item, "content") and item.content:
+    #             return item.content[0].text
+    return "Привет"
 
 
 def skynet_summarize(session_object: ChatSession) -> str:
@@ -127,23 +121,7 @@ def skynet_summarize(session_object: ChatSession) -> str:
             {
                 "role": "system",
                 "content": f"""
-                {utils.base_rules}
-                {utils.base_information}
-                """,
-            },
-            *inputs,
-            {
-                "role": "user",
-                "content": f"""
-Based on the conversation history, provide a concise summary
-and feedback focusing solely on the user’s behavior, not your own responses. 
-You are role-playing as the character defined in {session_object.current_role.behaviour}.
-Analyze the user’s communication style, questions, interests, and needs. 
-Provide actionable feedback on how the user could improve their approach to better persuade or sell to this character,
-considering their motivations, pain points, and preferences (e.g., for Настя: emphasize affordability, social proof, or trendy appeals). 
-Stay in character’s context without referencing the prompt.
-Example: For Настя, you might say, 
-“You sounded enthusiastic, but I got lost without clear pricing. Next time, mention student discounts or TikTok reviews early—I’d be more hooked!”
+
 **Use Markdown to format your response for clarity and emphasis:**
 - Use **bold** for emphasis (e.g., **important points**).
 - Use *italics* for subtle emphasis or tone (e.g., *sounds interesting*).
@@ -151,10 +129,13 @@ Example: For Настя, you might say,
 - Use numbered lists (`1.`) for ordered steps or priorities.
 - Use inline code (`text`) for technical terms or examples.
 - Use blockquotes (`>`) for highlighting key user questions or statements.
+{session_object.current_role.summarize_behaviour}
 """,
             },
+            *inputs,
         ],
     )
+
     for item in response.output:
         if hasattr(item, "content") and item.content:
             return item.content[0].text

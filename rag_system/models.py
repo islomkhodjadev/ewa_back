@@ -78,7 +78,10 @@ class Roles(models.Model):
     name = models.CharField(unique=True, verbose_name="Название")
     summarize_behaviour = models.TextField(
         verbose_name="Поведение итоги",
-        default="Here you should summarize based on the history and your behaviour",
+        default="Here you should shortly summarize user behaviour on the given history and put score from 10.",
+    )
+    portret = models.TextField(
+        verbose_name="портрет", default="Think yourself as person"
     )
 
     class Meta:
