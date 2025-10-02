@@ -82,7 +82,7 @@ async def start_bad_test(message: types.Message, state: FSMContext, client: BotC
         keyboard=[
             [KeyboardButton(text="1,3,5"), KeyboardButton(text="2,4,6")],
             [KeyboardButton(text="1,2,3"), KeyboardButton(text="4,5,6")],
-            [KeyboardButton(text="7"), KeyboardButton(text="1,4,7")],
+            [KeyboardButton(text="7,5,6"), KeyboardButton(text="1,4,7")],
             [KeyboardButton(text="⬅️ Назад")],
         ],
     )
@@ -322,10 +322,14 @@ async def handle_bonus_request(message: types.Message, state: FSMContext):
 Как принимать?
 {bonus_products_text}
 
-Отправь "Хочу рекомендации" чтобы получить полный список всех 6 продуктов!
+Спасибо за прохождение теста! 🎉
+Надеемся, эти рекомендации помогут тебе чувствовать себя лучше!
     """.strip()
 
     await message.answer(bonus_text)
+    # For other states, go to main menu
+    await give_parent_tree(message, message.bot, from_back=True)
+    await state.clear()
 
 
 # Handle full recommendations request - show all 6 products
@@ -366,6 +370,9 @@ async def handle_full_recommendations(message: types.Message, state: FSMContext)
     """.strip()
 
     await message.answer(recommendations_text)
+    # For other states, go to main menu
+    await give_parent_tree(message, message.bot, from_back=True)
+    await state.clear()
 
 
 # Handle back navigation
