@@ -215,7 +215,7 @@ async def show_test_results(
     sorted_categories = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     top_categories = [cat for cat, score in sorted_categories[:3]]
 
-    # Get primary products - FIXED: Use list comprehension with async for
+    # Get primary products
     primary_products = [
         product
         async for product in BadTestProduct.objects.filter(
@@ -223,7 +223,7 @@ async def show_test_results(
         )
     ]
 
-    # Get secondary products - FIXED: Use list comprehension with async for
+    # Get secondary products
     secondary_products = [
         product
         async for product in BadTestProduct.objects.filter(
@@ -231,18 +231,54 @@ async def show_test_results(
         )
     ]
 
+    # Ensure we have exactly 3 primary products from the available ones
+    # First try to get 3 primary products, if not enough, fill with secondary
+    final_primary_products = primary_products[:3]  # Take first 3 primary
+
+    # If we need more primary products, take from secondary
+    if len(final_primary_products) < 3:
+        needed = 3 - len(final_primary_products)
+        # Take secondary products that aren't already in primary
+        additional_secondary = [
+            p for p in secondary_products if p not in final_primary_products
+        ][:needed]
+        final_primary_products.extend(additional_secondary)
+
+    # Update secondary products to exclude those used in primary
+    final_secondary_products = [
+        p for p in secondary_products if p not in final_primary_products
+    ]
+
+    # Ensure we have at least 3 secondary products for bonus
+    # If we need more secondary products, get any other active products
+    if len(final_secondary_products) < 3:
+        needed = 3 - len(final_secondary_products)
+        # Get additional products that aren't in primary or secondary
+        used_products = [
+            p.name for p in final_primary_products + final_secondary_products
+        ]
+        additional_products = [
+            product
+            async for product in BadTestProduct.objects.filter(is_active=True).exclude(
+                name__in=used_products
+            )
+        ]
+        final_secondary_products.extend(additional_products[:needed])
+
     # Store results in session
-    session.answers_data["primary_products"] = [p.name for p in primary_products]
-    session.answers_data["secondary_products"] = [p.name for p in secondary_products]
+    session.answers_data["primary_products"] = [p.name for p in final_primary_products]
+    session.answers_data["secondary_products"] = [
+        p.name for p in final_secondary_products
+    ]
     session.answers_data["product_details"] = {
-        p.name: p.dosage for p in (primary_products + secondary_products)
+        p.name: p.dosage for p in (final_primary_products + final_secondary_products)
     }
     session.is_completed = True
     await session.asave()
 
-    # Show results
+    # Build the result text
     primary_products_text = "\n".join(
-        [f"{p.name} - {p.dosage}" for p in primary_products]
+        [f"{p.name} - {p.dosage}" for p in final_primary_products]
     )
 
     result_text = f"""
@@ -254,9 +290,9 @@ async def show_test_results(
 На основе твоих ответов мы собрали персональную подборку БАДов.
 
 Твоя персональная БАД тройка:
-1. {primary_products[0].name if primary_products else 'N/A'}
-2. {primary_products[1].name if len(primary_products) > 1 else 'N/A'}  
-3. {primary_products[2].name if len(primary_products) > 2 else 'N/A'}
+1. {final_primary_products[0].name}
+2. {final_primary_products[1].name}  
+3. {final_primary_products[2].name}
 
 Как принимать?
 {primary_products_text}
