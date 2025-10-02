@@ -32,7 +32,10 @@ class ButtonTree(models.Model):
         ]
 
     def __str__(self) -> str:
-        return self.text
+        if self.parent:
+            return f"{self.text} (родитель: {self.parent.text})"
+        else:
+            return f"{self.text} (главный)"
 
     def is_root(self):
         return self.parent is None
