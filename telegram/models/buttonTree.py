@@ -18,6 +18,7 @@ class ButtonTree(models.Model):
     class Meta:
         verbose_name = "🔘 Кнопка"
         verbose_name_plural = "🔘 Дерево кнопок"
+        unique_together = ["parent", "text"]
 
     def __str__(self) -> str:
         return self.text
