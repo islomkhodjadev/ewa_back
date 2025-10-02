@@ -1,164 +1,96 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
 
-# Minimal start script:
-# - clone HF repo to models/
-# - ensure git-lfs and pull LFS objects (with retries)
-# - verify presence of model weights (pytorch_model.bin or model.safetensors)
-# - start docker compose with docker compose.prod.yml
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-REPO="https://huggingface.co/intfloat/multilingual-e5-base"
-MODEL_DIR="models/multilingual-e5-base"
-COMPOSE_FILE="docker-compose.prod.yml"
-LFS_RETRIES=5
-LFS_SLEEP=10
-
-echo
-echo ">>> start.sh: clone, pull LFS, then docker compose up"
-echo
-
-# helper: check command exists
-_cmd_exists() {
-  command -v "$1" >/dev/null 2>&1
-}
-
-# 1) basic prechecks
-if ! _cmd_exists git; then
-  echo "ERROR: git is not installed. Please install git and retry." >&2
-  exit 1
-fi
-
-if ! _cmd_exists docker; then
-  echo "ERROR: docker is not installed or not in PATH." >&2
-  exit 1
-fi
-
-# docker compose might be v2 plugin 'docker compose'
-if _cmd_exists docker compose; then
-  DOCKER_COMPOSE_CMD="docker compose"
-elif docker compose version >/dev/null 2>&1; then
-  DOCKER_COMPOSE_CMD="docker compose"
+# Load environment variables
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | xargs)
+    echo -e "${GREEN}✅ Environment variables loaded from .env${NC}"
 else
-  echo "ERROR: docker compose not found. Install docker compose or use Docker Compose v2." >&2
-  exit 1
+    echo -e "${YELLOW}⚠️  No .env file found, using defaults${NC}"
 fi
 
-# Create parent models folder
-mkdir -p models
+# Set scaling from .env or use defaults
+BACKEND_SCALE=${BACKEND_SCALE:-8}
+WORKER_FAST_SCALE=${WORKER_FAST_SCALE:-6}
+GUNICORN_WORKERS=${GUNICORN_WORKERS:-8}
+WORKER_FAST_CONCURRENCY=${WORKER_FAST_CONCURRENCY:-8}
 
-# 2) clone if missing, otherwise fetch latest metadata
-if [ ! -d "${MODEL_DIR}/.git" ]; then
-  echo "Cloning ${REPO} -> ${MODEL_DIR} (shallow clone of default branch)"
-  git clone --depth 1 --single-branch "${REPO}" "${MODEL_DIR}"
-else
-  echo "Model repo already exists. Fetching latest metadata..."
-  git -C "${MODEL_DIR}" fetch --depth=1 origin || true
-  git -C "${MODEL_DIR}" pull --ff-only || true
-fi
+echo -e "${BLUE}🚀 Starting application with scaling:${NC}"
+echo -e "   - Backend instances: ${BACKEND_SCALE}"
+echo -e "   - Worker-fast instances: ${WORKER_FAST_SCALE}"
+echo -e "   - Gunicorn workers per backend: ${GUNICORN_WORKERS}"
+echo -e "   - Worker concurrency: ${WORKER_FAST_CONCURRENCY}"
 
-# 3) ensure git-lfs initialized
-if ! _cmd_exists git-lfs; then
-  echo "git-lfs not found. Attempting to continue; consider installing git-lfs for faster LFS pulls."
-else
-  echo "Initializing git-lfs hooks..."
-  git lfs install --local --force
-fi
+# Stop and remove existing containers
+echo -e "\n${YELLOW}🛑 Stopping existing containers...${NC}"
+docker-compose -f docker-compose.prod.yml down
 
-# 4) pull LFS objects with simple retry logic
-pull_lfs() {
-  if ! _cmd_exists git-lfs; then
-    return 1
-  fi
+# Build and start with scaling
+echo -e "\n${BLUE}🔨 Building and starting containers...${NC}"
+docker-compose -f docker-compose.prod.yml up -d --build --scale backend=$BACKEND_SCALE --scale worker-fast=$WORKER_FAST_SCALE
 
-  echo "Running: git lfs fetch --all && git lfs checkout in ${MODEL_DIR}"
-  git -C "${MODEL_DIR}" lfs fetch --all
-  git -C "${MODEL_DIR}" lfs checkout
-}
+# Wait for services to start
+echo -e "\n${YELLOW}⏳ Waiting for services to initialize (10 seconds)...${NC}"
+sleep 10
 
-LFS_OK=0
-if _cmd_exists git-lfs; then
-  for attempt in $(seq 1 "${LFS_RETRIES}"); do
-    echo "LFS pull attempt ${attempt}/${LFS_RETRIES}..."
-    if pull_lfs; then
-      echo "git-lfs pull/checkout succeeded."
-      LFS_OK=1
-      break
+# Health checks
+echo -e "\n${BLUE}🔍 Running health checks...${NC}"
+
+# Check container status
+echo -e "\n${YELLOW}📊 Container Status:${NC}"
+docker-compose -f docker-compose.prod.yml ps
+
+# Check database connections
+echo -e "\n${YELLOW}🗄️  Database Connections:${NC}"
+for i in $(seq 1 $BACKEND_SCALE); do
+    container_name="ewa_back-backend-${i}"
+    if docker ps --format "table {{.Names}}" | grep -q "$container_name"; then
+        echo -n "Backend-${i}: "
+        docker exec $container_name python -c "
+from django.db import connection
+try:
+    connection.ensure_connection()
+    print('✅ DB OK')
+except Exception as e:
+    print('❌ DB FAIL')
+" 2>/dev/null || echo -e "${RED}❌ Container not ready${NC}"
     else
-      echo "git-lfs pull failed (attempt ${attempt}). Sleeping ${LFS_SLEEP}s and retrying..."
-      sleep "${LFS_SLEEP}"
+        echo -e "Backend-${i}: ${RED}❌ Not running${NC}"
     fi
-  done
-else
-  echo "Skipping git-lfs pull because git-lfs binary not found."
-fi
+done
 
-# 5) verify we have a weights file (pytorch_model.bin or model.safetensors)
-WEIGHT_FOUND=0
-if [ -f "${MODEL_DIR}/pytorch_model.bin" ] || [ -f "${MODEL_DIR}/model.safetensors" ]; then
-  WEIGHT_FOUND=1
-fi
-
-# Fallback: if weights missing and huggingface_hub is installed, try direct download of just weights
-if [ "${WEIGHT_FOUND}" -eq 0 ]; then
-  if python3 -c "import huggingface_hub" >/dev/null 2>&1; then
-    echo "Weights not found locally. huggingface_hub available — attempting to download weight file(s) directly (minimal files only)."
-    python3 -c "
-from huggingface_hub import hf_hub_download
-import sys, os
-
-repo = 'intfloat/multilingual-e5-base'
-target = os.path.join('models','multilingual-e5-base')
-os.makedirs(target, exist_ok=True)
-
-candidates = ['model.safetensors','pytorch_model.bin']
-for fname in candidates:
-    try:
-        print('Downloading', fname)
-        hf_hub_download(repo_id=repo, filename=fname, local_dir=target)
-        print('Downloaded', fname)
-        sys.exit(0)
-    except Exception as e:
-        print('Could not download', fname, ':', e)
-# if here, none succeeded
-sys.exit(2)
-"
-    # re-check
-    if [ -f "${MODEL_DIR}/pytorch_model.bin" ] || [ -f "${MODEL_DIR}/model.safetensors" ]; then
-      WEIGHT_FOUND=1
+# Check worker status
+echo -e "\n${YELLOW}👷 Worker Status:${NC}"
+for i in $(seq 1 $WORKER_FAST_SCALE); do
+    container_name="ewa_back-worker-fast-${i}"
+    if docker ps --format "table {{.Names}}" | grep -q "$container_name"; then
+        echo -e "Worker-fast-${i}: ${GREEN}✅ Running${NC}"
+    else
+        echo -e "Worker-fast-${i}: ${RED}❌ Not running${NC}"
     fi
-  else
-    echo "huggingface_hub not available. If git-lfs pull failed and you don't want to download full repo, install huggingface_hub (\`pip install huggingface_hub\`) to allow minimal direct weight downloads."
-  fi
-fi
+done
 
-if [ "${WEIGHT_FOUND}" -eq 0 ]; then
-  echo
-  echo "WARNING: model weight not found in ${MODEL_DIR}."
-  echo "Expected one of: pytorch_model.bin or model.safetensors"
-  echo "You can either:"
-  echo "  - install git-lfs and re-run \`git -C ${MODEL_DIR} lfs pull\`"
-  echo "  - or install huggingface_hub and allow the script to fetch the weight directly"
-  echo
-  read -p "Continue to docker compose up anyway? [y/N] " yn || true
-  case "$yn" in
-    [Yy]* ) echo "Proceeding to docker compose up (but container may fail without weights)";;
-    * ) echo "Aborting."; exit 1;;
-  esac
-else
-  echo "Model weight file is present. Good to go."
-fi
+# Check Redis connection
+echo -e "\n${YELLOW}🔴 Redis Connection:${NC}"
+docker exec ewa_redis redis-cli ping | grep -q "PONG" && echo -e "Redis: ${GREEN}✅ Connected${NC}" || echo -e "Redis: ${RED}❌ Failed${NC}"
 
-# 6) Bring up docker compose
-if [ ! -f "${COMPOSE_FILE}" ]; then
-  echo "ERROR: ${COMPOSE_FILE} not found in current directory $(pwd). Please run this script from the project root containing ${COMPOSE_FILE}." >&2
-  exit 1
-fi
+# Display port mappings
+echo -e "\n${YELLOW}🌐 Port Mappings:${NC}"
+echo "Backend instances are available on ports: 8000-$((8000 + BACKEND_SCALE - 1))"
+echo "Flower monitoring: http://localhost:5555"
 
-echo "Starting docker compose using ${COMPOSE_FILE}..."
-# Build and start in detached mode
-${DOCKER_COMPOSE_CMD} -f "${COMPOSE_FILE}" up -d --build
+# Show quick monitoring commands
+echo -e "\n${GREEN}📈 Quick Monitoring Commands:${NC}"
+echo -e "  ${BLUE}View all logs:${NC}    docker-compose -f docker-compose.prod.yml logs -f"
+echo -e "  ${BLUE}View backend logs:${NC} docker-compose -f docker-compose.prod.yml logs -f backend"
+echo -e "  ${BLUE}View worker logs:${NC}  docker-compose -f docker-compose.prod.yml logs -f worker-fast"
+echo -e "  ${BLUE}Container status:${NC}  docker-compose -f docker-compose.prod.yml ps"
+echo -e "  ${BLUE}Resource usage:${NC}    docker stats --no-stream"
 
-echo
-echo "Done. Containers started (if compose succeeded)."
-echo "If you mounted the model as a volume in your compose file, ensure the container sees ${MODEL_DIR} at the expected path."
-
+echo -e "\n${GREEN}🎯 Application started successfully!${NC}"

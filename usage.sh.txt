@@ -1,0 +1,14 @@
+# Make scripts executable
+chmod +x start.sh monitor.sh stop.sh
+
+# Start the application
+./start.sh
+
+# Monitor once
+./monitor.sh
+
+# Monitor continuously
+./monitor.sh continuous
+
+# Stop everything
+./stop.sh
