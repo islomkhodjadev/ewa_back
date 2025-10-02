@@ -326,8 +326,6 @@ async def handle_bonus_request(message: types.Message, state: FSMContext):
     """.strip()
 
     await message.answer(bonus_text)
-    await give_parent_tree(message, message.bot, from_back=True)
-    await state.clear()
 
 
 # Handle full recommendations request - show all 6 products
@@ -368,7 +366,6 @@ async def handle_full_recommendations(message: types.Message, state: FSMContext)
     """.strip()
 
     await message.answer(recommendations_text)
-    # For other states, go to main menu
 
 
 # Handle back navigation
