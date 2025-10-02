@@ -3,6 +3,8 @@ from django.core.exceptions import ValidationError
 import os
 from PIL import Image
 
+from django.db import models
+
 
 class ButtonTree(models.Model):
     text = models.CharField(max_length=255, verbose_name="Текст кнопки")
@@ -18,7 +20,16 @@ class ButtonTree(models.Model):
     class Meta:
         verbose_name = "🔘 Кнопка"
         verbose_name_plural = "🔘 Дерево кнопок"
-        unique_together = ["parent", "text"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["parent", "text"], name="unique_button_when_parent_exists"
+            ),
+            models.UniqueConstraint(
+                fields=["text"],
+                condition=models.Q(parent__isnull=True),
+                name="unique_root_button_text",
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.text
