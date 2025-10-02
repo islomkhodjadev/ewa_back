@@ -4,6 +4,7 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
 from miniapp.models import ChatSession, Message
+from rag_system.utils.get_buttons import get_buttons
 from telegram_client.models import BotClient
 from miniapp.serializers import ChatSessionSerializer
 from rag_system.tasks import (
@@ -63,7 +64,16 @@ class NotificationsConsumer(AsyncJsonWebsocketConsumer):
             "messages"
         )  # or "messages" if that's your related_name
         session = qs.filter(pk=session_id).first()
-        return ChatSessionSerializer(session).data if session else None
+        if session:
+            data = ChatSessionSerializer(session).data
+
+            buttons = get_buttons(session)
+            if "buttons" in buttons:
+                data["buttons"] = buttons["buttons"]
+            elif "roles" in buttons:
+                data["roles"] = buttons["roles"]
+            return data
+        return None
 
     # ------------------------------- WS lifecycle ----------------------------------
 

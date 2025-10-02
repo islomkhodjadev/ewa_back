@@ -19,16 +19,7 @@ class ChatSessionSerializer(serializers.ModelSerializer):
     bot_client = BotClientSerializers(read_only=True)
     messages = MessageSerializer(many=True, read_only=True)
     current_role = RolesSerializer(read_only=True)
-    buttons = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ChatSession
-        fields = ("id", "bot_client", "messages", "mode", "current_role", "buttons")
-
-    def get_buttons(self, obj):
-        buttons = get_buttons(obj)
-        if "buttons" in buttons:
-            return buttons["buttons"]
-        elif "roles" in buttons:
-            return buttons["roles"]
-        return None
+        fields = ("id", "bot_client", "messages", "mode", "current_role")
