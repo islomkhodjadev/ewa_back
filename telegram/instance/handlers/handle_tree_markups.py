@@ -275,6 +275,7 @@ async def send_full_attachment(
 ):
     """
     Sends the attachment linked to a ButtonTree node with proper text and media limits.
+    Only includes captions when there's actual text content.
     """
 
     # Choose base text
@@ -286,23 +287,20 @@ async def send_full_attachment(
         """Split text into chunks that don't exceed max_length."""
         if len(text) <= max_length:
             return [text]
-
         chunks = []
         while text:
             if len(text) <= max_length:
                 chunks.append(text)
                 break
-            # Find the last space within the limit
             split_pos = text.rfind(" ", 0, max_length)
             if split_pos == -1:
-                # No spaces found, force split
                 split_pos = max_length
             chunks.append(text[:split_pos])
             text = text[split_pos:].strip()
         return chunks
 
     def get_caption_for_media(text: str) -> Optional[str]:
-        """Get caption for media (max 1024 chars) or None if too long."""
+        """Get caption for media only if text exists and fits limit."""
         return text if text and len(text) <= 1024 else None
 
     # TEXT-only case
@@ -317,7 +315,6 @@ async def send_full_attachment(
                     parse_mode=ParseMode.HTML,
                 )
         elif buttons:
-            # If no text but we have buttons, just send buttons
             await message.answer("Выберите действие:", reply_markup=buttons)
         return
 
@@ -328,23 +325,27 @@ async def send_full_attachment(
 
     # FILE: send documents with proper caption handling
     if attachment.source_type == attachment.FILE:
-        # Send text first if it's too long for caption
+        # Send text first if it exists
         text_chunks = split_long_text(base_text)
         media_caption = get_caption_for_media(base_text)
 
-        # If text is too long for caption, send it as separate messages first
+        # If text exists, send it as separate messages first
         text_sent_separately = False
-        if media_caption is None and base_text:
+        if base_text:
             for chunk in text_chunks:
                 await message.answer(chunk, parse_mode=ParseMode.HTML)
             media_caption = None  # Don't use caption after sending text separately
             text_sent_separately = True
 
-        # Send documents
+        # Send documents without captions if no text
         for idx, item in enumerate(files):
             path = item.source.path
-            is_last = idx == len(files) - 1
-            caption = media_caption if is_last and media_caption else None
+            # Only use caption for the last item if we have text and didn't send separately
+            caption = (
+                media_caption
+                if idx == len(files) - 1 and media_caption and not text_sent_separately
+                else None
+            )
 
             await bot.send_document(
                 chat_id=message.chat.id,
@@ -353,13 +354,11 @@ async def send_full_attachment(
                 parse_mode=ParseMode.HTML if caption else None,
             )
 
-        # Send buttons at the end if we have them
+        # Send buttons at the end
         if buttons:
-            # Only send additional message if text was sent separately or we have files
             if text_sent_separately or files:
                 await message.answer("Выберите действие:", reply_markup=buttons)
             else:
-                # No text and no files, just send buttons with minimal message
                 await message.answer("Выберите действие:", reply_markup=buttons)
         return
 
@@ -391,18 +390,17 @@ async def send_full_attachment(
             else:
                 file_items.append(item)
 
-        # Handle text - send long text first
+        # Handle text - send text first if it exists
         text_chunks = split_long_text(base_text)
         media_caption = get_caption_for_media(base_text)
 
-        # Track if we sent text separately
         text_sent_separately = False
-        if media_caption is None and base_text:
+        if base_text:
             for chunk in text_chunks:
                 await message.answer(chunk, parse_mode=ParseMode.HTML)
             text_sent_separately = True
 
-        # Step 1: Send all files first
+        # Send files first
         if file_items:
             for item in file_items:
                 path = item.source.path
@@ -411,7 +409,7 @@ async def send_full_attachment(
                     document=FSInputFile(path),
                 )
 
-        # Step 2: Send media items as media groups (max 10 per group)
+        # Send media items
         media_was_sent = False
         if media_items:
             total_media = len(media_items)
@@ -427,10 +425,13 @@ async def send_full_attachment(
                     ext = os.path.splitext(path)[1].lower()
                     is_global_last = start + i == total_media - 1
 
-                    # Use caption only on the last item of the last chunk
+                    # Only use caption if we have text and it's the last item
                     caption_text = (
                         media_caption
-                        if is_global_last and media_caption and not caption_used
+                        if is_global_last
+                        and media_caption
+                        and not caption_used
+                        and not text_sent_separately
                         else None
                     )
                     if caption_text:
@@ -439,7 +440,6 @@ async def send_full_attachment(
                     if ext in IMAGE_EXTS:
                         size = os.path.getsize(path)
                         if size > PHOTO_MAX_BYTES:
-                            # Too big for photo: send as document
                             await bot.send_document(
                                 chat_id=message.chat.id,
                                 document=FSInputFile(path),
@@ -455,14 +455,13 @@ async def send_full_attachment(
                         thumbnail = None
                         if item.thumbnail:
                             thumbnail = FSInputFile(item.thumbnail.path)
-
                         mg.add_video(
                             media=FSInputFile(path),
                             thumbnail=thumbnail,
                             caption=caption_text,
                         )
 
-                # Send media group if we have at least 2 items, otherwise send individually
+                # Send media group
                 media_group = mg.build()
                 if len(media_group) >= 2:
                     await bot.send_media_group(
@@ -478,14 +477,12 @@ async def send_full_attachment(
                             parse_mode=ParseMode.HTML if single_media.caption else None,
                         )
                     elif single_media.type == "video":
-                        # Find the corresponding item for thumbnail
                         item_idx = start
                         if item_idx < len(media_items):
                             current_item = media_items[item_idx]
                             thumbnail = None
                             if current_item.thumbnail:
                                 thumbnail = FSInputFile(current_item.thumbnail.path)
-
                         await bot.send_video(
                             chat_id=message.chat.id,
                             video=single_media.media,
@@ -494,11 +491,10 @@ async def send_full_attachment(
                             parse_mode=ParseMode.HTML if single_media.caption else None,
                         )
 
-        # Send buttons at the end only if we actually sent content
+        # Send buttons
         if buttons and (text_sent_separately or file_items or media_was_sent):
             await message.answer("Выберите действие:", reply_markup=buttons)
         elif buttons:
-            # No content was sent, just show buttons with minimal message
             await message.answer("Выберите действие:", reply_markup=buttons)
         return
 
@@ -521,14 +517,13 @@ async def send_full_attachment(
         text_chunks = split_long_text(base_text)
         media_caption = get_caption_for_media(base_text)
 
-        # Track if text was sent separately
         text_sent_separately = False
-        if media_caption is None and base_text:
+        if base_text:
             for chunk in text_chunks:
                 await message.answer(chunk, parse_mode=ParseMode.HTML)
             text_sent_separately = True
 
-        # Send media in groups
+        # Send media without captions if text was sent separately
         total_files = len(files)
         caption_used = False
         media_was_sent = False
@@ -537,18 +532,21 @@ async def send_full_attachment(
             chunk = files[start : start + TELEGRAM_MEDIA_GROUP_LIMIT]
             media_was_sent = True
 
-            # For homogeneous media, we can use media groups more efficiently
             if len(chunk) > 1:
                 mg = MediaGroupBuilder()
                 for i, item in enumerate(chunk):
                     path = item.source.path
                     is_global_last = start + i == total_files - 1
+
+                    # Only use caption if we have text and it's not sent separately
                     caption_text = (
                         media_caption
-                        if is_global_last and media_caption and not caption_used
+                        if is_global_last
+                        and media_caption
+                        and not caption_used
+                        and not text_sent_separately
                         else None
                     )
-
                     if caption_text:
                         caption_used = True
 
@@ -566,19 +564,19 @@ async def send_full_attachment(
                             thumbnail=thumbnail,
                             caption=caption_text,
                         )
-
                 await bot.send_media_group(chat_id=message.chat.id, media=mg.build())
             else:
-                # Single item
                 item = chunk[0]
                 path = item.source.path
                 is_global_last = start == total_files - 1
                 caption_text = (
                     media_caption
-                    if is_global_last and media_caption and not caption_used
+                    if is_global_last
+                    and media_caption
+                    and not caption_used
+                    and not text_sent_separately
                     else None
                 )
-
                 if caption_text:
                     caption_used = True
 
@@ -601,16 +599,15 @@ async def send_full_attachment(
                         parse_mode=ParseMode.HTML if caption_text else None,
                     )
 
-        # Send buttons only if content was actually sent
+        # Send buttons
         if buttons and (text_sent_separately or media_was_sent):
             await message.answer("Выберите действие:", reply_markup=buttons)
         elif buttons:
             await message.answer("Выберите действие:", reply_markup=buttons)
         return
 
-    # VIDEO_IMAGE (mixed) - similar to VIDEO_IMAGE_FILE but with different logic
+    # VIDEO_IMAGE (mixed)
     if attachment.source_type == attachment.VIDEO_IMAGE:
-        # Use the same logic as VIDEO_IMAGE_FILE since they're similar
         await send_full_attachment(
             message,
             attachment,
