@@ -2,10 +2,9 @@ version: "3.9"
 
 services:
   backend:
-    container_name: ewa_backend_django
     build: .
     ports:
-      - "8000:8000"   # only backend exposed outside
+      - "8000-8002:8000"   # 3 instances on ports 8000, 8001, 8002
     environment:
       DEBUG: ${DEBUG}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -30,13 +29,20 @@ services:
         exec gunicorn core.asgi:application
         -k uvicorn.workers.UvicornWorker
         --bind 0.0.0.0:8000
-        --timeout 180
-
+        --timeout 120
+        --workers 2           # Reduced workers per instance
+        --max-requests 100    # Restart workers periodically
+        --max-requests-jitter 20
     volumes:
       - ./static:/app/static
       - ./media:/app/media
       - ./logs:/app/log
       - .:/app
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
 
   db:
     image: pgvector/pgvector:pg17
@@ -45,14 +51,31 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_MAX_CONNECTIONS: 100
     volumes:
       - db_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
 
   redis:
     image: redis:7-alpine
     container_name: ewa_redis
+    command: >
+      redis-server
+      --maxmemory 512mb      # Reduced memory
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
     volumes:
       - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.3'
       
   # Fast/short tasks (low latency)
   worker-fast:
@@ -61,27 +84,40 @@ services:
       celery -A core worker
       --loglevel=INFO
       --queues=fast,default
-      --concurrency=4
+      --concurrency=2         # Reduced concurrency
       --prefetch-multiplier=1
-      --max-tasks-per-child=1000
-      --autoscale=12,4
+      --max-tasks-per-child=200  # Reduced for memory
+      --autoscale=4,2        # Reduced autoscale
     env_file: .env
     depends_on: [redis]
     volumes:
       - .:/app
-  # Heavy tasks isolated
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G       # More memory for Hugging Face
+          cpus: '1.0'
+
+  # Heavy tasks isolated (including embeddings)
   worker-slow:
     build: .
     command: >
       celery -A core worker
       --loglevel=INFO
       --queues=slow
-      --concurrency=2
+      --concurrency=1         # Single process for heavy tasks
       --prefetch-multiplier=1
-      --max-tasks-per-child=500
-      --autoscale=6,2
+      --max-tasks-per-child=100  # Restart frequently
+      --autoscale=2,1        # Minimal autoscale
     env_file: .env
     depends_on: [redis]
+    volumes:
+      - .:/app
+    deploy:
+      resources:
+        limits:
+          memory: 2G         # Most memory for Hugging Face
+          cpus: '1.0'
 
   # Scheduler (only one)
   beat:
@@ -91,6 +127,11 @@ services:
     depends_on: [redis]
     volumes:
       - .:/app
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.1'
 
   flower:
     build: .
@@ -99,9 +140,14 @@ services:
     depends_on: [redis]
     volumes:
       - .:/app
-
     ports:
-      - "5555:5555"   # expose Flower UI
+      - "5555:5555"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.1'
+
 volumes:
   db_data:
   redis_data:
