@@ -1,8 +1,18 @@
+upstream backend_servers {
+    server 127.0.0.1:8000 max_fails=3 fail_timeout=30s;
+    server 127.0.0.1:8001 max_fails=3 fail_timeout=30s;
+    server 127.0.0.1:8002 max_fails=3 fail_timeout=30s;
+    server 127.0.0.1:8003 max_fails=3 fail_timeout=30s;
+    server 127.0.0.1:8004 max_fails=3 fail_timeout=30s;
+    server 127.0.0.1:8005 max_fails=3 fail_timeout=30s;
+    server 127.0.0.1:8006 max_fails=3 fail_timeout=30s;
+    server 127.0.0.1:8007 max_fails=3 fail_timeout=30s;
+    keepalive 100;
+}
+
 server {
-    listen 80;
     server_name admin-helper.ewaproduct.com;
 
-    # increase if you upload large files
     client_max_body_size 1G;
 
     location /static/ {
@@ -17,23 +27,38 @@ server {
         expires 30d;
     }
 
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-
+    location /ws/ {
+        proxy_pass http://backend_servers;
         proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-
-        # WebSocket upgrade
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 300;
-        proxy_redirect off;
+        proxy_set_header X-Forwarded-Host $host;
+        
+        proxy_read_timeout 86400;
+        proxy_send_timeout 86400;
+        proxy_connect_timeout 60;
     }
 
-    # Basic gzip (optional)
+    location / {
+        proxy_pass http://backend_servers;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_read_timeout 60;
+        proxy_connect_timeout 60;
+        proxy_send_timeout 60;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+    }
+
     gzip on;
     gzip_types text/plain text/css application/json application/javascript application/xml image/svg+xml;
     gzip_min_length 1000;
