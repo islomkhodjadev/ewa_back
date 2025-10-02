@@ -78,46 +78,25 @@ services:
           cpus: '0.3'
       
   # Fast/short tasks (low latency)
+    # Fast/short tasks (low latency)
   worker-fast:
     build: .
-    command: >
-      celery -A core worker
-      --loglevel=INFO
-      --queues=fast,default
-      --concurrency=2         # Reduced concurrency
-      --prefetch-multiplier=1
-      --max-tasks-per-child=200  # Reduced for memory
-      --autoscale=4,2        # Reduced autoscale
+    command: 
+      - celery
+      - -A
+      - core
+      - worker
+      - --loglevel=INFO
+      - --queues=fast,default
+      - --concurrency=2
+      - --prefetch-multiplier=1
+      - --max-tasks-per-child=200
+      - --autoscale=4,2
     env_file: .env
     depends_on: [redis]
     volumes:
       - .:/app
-    deploy:
-      resources:
-        limits:
-          memory: 1.5G       # More memory for Hugging Face
-          cpus: '1.0'
 
-  # Heavy tasks isolated (including embeddings)
-  worker-slow:
-    build: .
-    command: >
-      celery -A core worker
-      --loglevel=INFO
-      --queues=slow
-      --concurrency=1         # Single process for heavy tasks
-      --prefetch-multiplier=1
-      --max-tasks-per-child=100  # Restart frequently
-      --autoscale=2,1        # Minimal autoscale
-    env_file: .env
-    depends_on: [redis]
-    volumes:
-      - .:/app
-    deploy:
-      resources:
-        limits:
-          memory: 2G         # Most memory for Hugging Face
-          cpus: '1.0'
 
   # Scheduler (only one)
   beat:
