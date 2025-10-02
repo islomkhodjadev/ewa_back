@@ -20,6 +20,7 @@ class ButtonTree(models.Model):
     class Meta:
         verbose_name = "🔘 Кнопка"
         verbose_name_plural = "🔘 Дерево кнопок"
+        ordering = ["text"]
         constraints = [
             models.UniqueConstraint(
                 fields=["parent", "text"], name="unique_button_when_parent_exists"
