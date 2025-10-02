@@ -89,14 +89,16 @@ async def use_tree(
             parent.text, reply_markup=buttons, parse_mode=ParseMode.HTML
         )
 
-    # 2) User is at root and selects a top-level node
+    # 1) User is at root and selects a top-level node
     if session.current_button is None:
         next_button = (
             await ButtonTree.objects.select_related("attachment")
-            .filter(parent=None, text=text_in)
+            .filter(parent=None, text=text_in)  # Explicitly check parent=None
             .afirst()
         )
         if next_button is None:
+            # Button not found at root level
+            logger.warning(f"Button '{text_in}' not found at root level")
             return
 
         children_qs = next_button.children.all()
@@ -109,7 +111,7 @@ async def use_tree(
                     next_button.attachment,
                     bot,
                     buttons=back_keyboard(),
-                    fallback_text=next_button.text,  # use button text if attachment.text missing
+                    fallback_text=next_button.text,
                 )
             return await message.answer(
                 next_button.text,
@@ -127,37 +129,49 @@ async def use_tree(
         )
 
         if hasattr(next_button, "attachment"):
-            # ALWAYS send the parent's attachment (if any)...
             await send_full_attachment(
                 message,
                 next_button.attachment,
                 bot,
-                buttons=buttons,  # helper may attach markup to text if it sends any
-                fallback_text=next_button.text,  # used only if attachment.text is empty
+                buttons=buttons,
+                fallback_text=next_button.text,
             )
-            # ...and THEN ALWAYS show child buttons so user can navigate right away
             return await message.answer(
                 next_button.text,
                 reply_markup=buttons,
                 parse_mode=ParseMode.HTML,
             )
 
-        # No attachment → just show node title + children
         return await message.answer(
             next_button.text,
             reply_markup=buttons,
             parse_mode=ParseMode.HTML,
         )
 
-    # 3) User is traversing deeper
+    # 2) User is traversing deeper - FIXED VERSION
     if session.current_button is not None:
-        next_button = (
+        # Get ALL potential next buttons with this name
+        potential_buttons = (
             await session.current_button.children.all()
             .select_related("attachment")
             .filter(text=text_in)
-            .afirst()
+            .alist()
         )
-        if next_button is None:
+
+        if not potential_buttons:
+            # Button not found among children
+            logger.warning(
+                f"Button '{text_in}' not found among children of '{session.current_button.text}'"
+            )
+            return
+
+        # If multiple buttons with same name exist, take the first one
+        # You might want to add additional logic here if needed
+        next_button = potential_buttons[0]
+
+        # Additional safety check - verify parent relationship
+        if next_button.parent_id != session.current_button.id:
+            logger.error(f"Parent-child relationship mismatch for button '{text_in}'")
             return
 
         children_qs = next_button.children.all()
@@ -186,8 +200,8 @@ async def use_tree(
             children_qs,
             extra_buttons=[BACK_BTN],
         )
+
         if hasattr(next_button, "attachment"):
-            # ALWAYS send the parent's attachment...
             await send_full_attachment(
                 message,
                 next_button.attachment,
@@ -195,7 +209,6 @@ async def use_tree(
                 buttons=buttons,
                 fallback_text=next_button.text,
             )
-            # ...and THEN ALWAYS show child buttons
             return await message.answer(
                 next_button.text,
                 reply_markup=buttons,
