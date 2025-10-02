@@ -151,12 +151,13 @@ async def use_tree(
     # 2) User is traversing deeper - FIXED VERSION
     if session.current_button is not None:
         # Get ALL potential next buttons with this name
-        potential_buttons = (
-            await session.current_button.children.all()
+        # In section 2) User is traversing deeper:
+        potential_buttons = [
+            button
+            async for button in session.current_button.children.all()
             .select_related("attachment")
             .filter(text=text_in)
-            .alist()
-        )
+        ]
 
         if not potential_buttons:
             # Button not found among children
