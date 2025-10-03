@@ -37,21 +37,42 @@ def reply_markup_builder(
 
 
 async def reply_markup_builder_from_model(
-    buttons, adjusting: list[int] = [], extra_buttons: list[str] = []
+    buttons,
+    adjusting: list[int] = [],
+    extra_buttons: list[str] = [],
+    sort_by: str = "weight",  # 'weight', 'text', or 'custom'
 ) -> aiogram.types.ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
 
-    async for button in buttons:  # async iteration over queryset
+    button_list = []
+    async for button in buttons:
+        button_list.append(button)
+
+    # Different sorting strategies
+    if sort_by == "weight":
+        button_list.sort(key=lambda x: (-x.weight, x.text))
+    elif sort_by == "text":
+        button_list.sort(key=lambda x: x.text)
+    elif sort_by == "custom":
+        # Custom sorting logic - modify as needed
+        button_list.sort(key=lambda x: (-x.weight, x.text))
+    else:
+        # Default: weight descending, then text ascending
+        button_list.sort(key=lambda x: (-x.weight, x.text))
+
+    for button in button_list:
         builder.button(text=button.text)
+
     if extra_buttons:
         for text in extra_buttons:
             if text == "Виртуальный помощник":
                 builder.button(text=text, web_app=WebAppInfo(url=settings.MINIAPP_URL))
                 continue
             builder.button(text=text)
-    if adjusting:
 
+    if adjusting:
         builder.adjust(*adjusting)
     else:
         builder.adjust(2)
+
     return builder.as_markup(resize_keyboard=True)

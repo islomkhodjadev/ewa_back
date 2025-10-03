@@ -16,11 +16,16 @@ class ButtonTree(models.Model):
         blank=True,
         verbose_name="Родительская кнопка",
     )
+    weight = models.IntegerField(
+        default=0,
+        verbose_name="Вес",
+        help_text="Чем выше число, тем выше приоритет в списке. При одинаковом весе сортируется по тексту.",
+    )
 
     class Meta:
         verbose_name = "🔘 Кнопка"
         verbose_name_plural = "🔘 Дерево кнопок"
-        ordering = ["text"]
+        ordering = ["-weight", "text"]  # Sort by weight DESC, then text ASC
         constraints = [
             models.UniqueConstraint(
                 fields=["parent", "text"], name="unique_button_when_parent_exists"
@@ -34,9 +39,9 @@ class ButtonTree(models.Model):
 
     def __str__(self) -> str:
         if self.parent:
-            return f"{self.text} (родитель: {self.parent.text})"
+            return f"{self.text} (родитель: {self.parent.text}, вес: {self.weight})"
         else:
-            return f"{self.text} (главный)"
+            return f"{self.text} (главный, вес: {self.weight})"
 
     def is_root(self):
         return self.parent is None

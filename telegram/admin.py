@@ -6,6 +6,12 @@ import os
 
 from .models import ButtonTree, AttachmentToButton, AttachmentData
 
+from django.db.models import Count
+from django.http import HttpResponseRedirect
+from django.urls import path
+from django.core.cache import cache
+from django.db import models
+
 
 # ---------- Inlines ----------
 class AttachmentDataInline(TabularInline):
@@ -61,16 +67,28 @@ class ButtonTreeAdmin(ModelAdmin):
     list_display = (
         "id",
         "text",
+        "weight",
         "parent",
         "children_count",
         "has_material",
         "files_count",
         "is_root",
         "is_leaf",
+        "move_buttons",
     )
+    list_display_links = ("id", "text")
     list_filter = ("parent",)
     search_fields = ("text", "parent__text")
-    ordering = ("parent__id", "id")
+    ordering = (
+        "parent__id",
+        "-weight",
+        "text",
+    )  # Sort by parent, then weight DESC, then text
+    list_editable = ("weight",)  # Allow direct editing in list view
+    list_per_page = 50
+
+    # Add custom admin views
+    change_list_template = "admin/buttontree_change_list.html"
 
     # This is the key - both levels nested under ButtonTree
     inlines = [AttachmentToButtonInline]
@@ -78,18 +96,30 @@ class ButtonTreeAdmin(ModelAdmin):
     fieldsets = (
         (
             "Основная информация",
-            {"fields": ("text", "parent"), "description": "Основные настройки кнопки"},
+            {
+                "fields": ("text", "parent", "weight"),
+                "description": "Основные настройки кнопки",
+            },
         ),
     )
 
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        return queryset.annotate(children_count_anno=Count("children"))
+
     def children_count(self, obj):
-        count = obj.children.count()
+        count = (
+            obj.children_count_anno
+            if hasattr(obj, "children_count_anno")
+            else obj.children.count()
+        )
         color = "green" if count > 0 else "gray"
         return format_html(
             '<span style="color: {}; font-weight: bold;">{}</span>', color, count
         )
 
     children_count.short_description = "👶 Дочерних узлов"
+    children_count.admin_order_field = "children_count_anno"
 
     def has_material(self, obj):
         return hasattr(obj, "attachment") and obj.attachment is not None
@@ -108,9 +138,105 @@ class ButtonTreeAdmin(ModelAdmin):
 
     files_count.short_description = "📂 Файлов"
 
+    def move_buttons(self, obj):
+        """Add up/down buttons for quick weight adjustment"""
+        if obj.parent:
+            siblings_count = ButtonTree.objects.filter(parent=obj.parent).count()
+            if siblings_count > 1:
+                return format_html(
+                    """
+                    <div style="display: flex; gap: 5px;">
+                        <a href="{}" style="background: #4CAF50; color: white; padding: 2px 6px; text-decoration: none; border-radius: 3px;">↑</a>
+                        <a href="{}" style="background: #f44336; color: white; padding: 2px 6px; text-decoration: none; border-radius: 3px;">↓</a>
+                    </div>
+                    """,
+                    f"{obj.id}/increase-weight/",
+                    f"{obj.id}/decrease-weight/",
+                )
+        return "-"
+
+    move_buttons.short_description = "📊 Изменить вес"
+    move_buttons.allow_tags = True
+
+    def get_urls(self):
+        """Add custom URLs for weight adjustment"""
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "<path:object_id>/increase-weight/",
+                self.admin_site.admin_view(self.increase_weight),
+                name="buttontree_increase_weight",
+            ),
+            path(
+                "<path:object_id>/decrease-weight/",
+                self.admin_site.admin_view(self.decrease_weight),
+                name="buttontree_decrease_weight",
+            ),
+        ]
+        return custom_urls + urls
+
+    def increase_weight(self, request, object_id):
+        """Increase weight by 10"""
+        try:
+            obj = ButtonTree.objects.get(id=object_id)
+            obj.weight += 10
+            obj.save()
+            self.message_user(
+                request, f"Вес кнопки '{obj.text}' увеличен до {obj.weight}"
+            )
+        except ButtonTree.DoesNotExist:
+            self.message_user(request, "Кнопка не найдена", level="error")
+
+        # Clear cache if you're caching the buttons
+        cache.delete("button_tree_cache")
+
+        return HttpResponseRedirect(request.META.get("HTTP_REFERER", "../"))
+
+    def decrease_weight(self, request, object_id):
+        """Decrease weight by 10"""
+        try:
+            obj = ButtonTree.objects.get(id=object_id)
+            obj.weight -= 10
+            obj.save()
+            self.message_user(
+                request, f"Вес кнопки '{obj.text}' уменьшен до {obj.weight}"
+            )
+        except ButtonTree.DoesNotExist:
+            self.message_user(request, "Кнопка не найдена", level="error")
+
+        # Clear cache if you're caching the buttons
+        cache.delete("button_tree_cache")
+
+        return HttpResponseRedirect(request.META.get("HTTP_REFERER", "../"))
+
     def get_inline_instances(self, request, obj=None):
         """Ensure inlines work for both create and edit views"""
         return super().get_inline_instances(request, obj)
+
+    def save_model(self, request, obj, form, change):
+        """Auto-set weight for new objects if not set"""
+        if not change and obj.weight == 0:
+            # Set default weight based on siblings
+            if obj.parent:
+                max_weight = (
+                    ButtonTree.objects.filter(parent=obj.parent).aggregate(
+                        models.Max("weight")
+                    )["weight__max"]
+                    or 0
+                )
+                obj.weight = max_weight + 10
+            else:
+                max_weight = (
+                    ButtonTree.objects.filter(parent__isnull=True).aggregate(
+                        models.Max("weight")
+                    )["weight__max"]
+                    or 0
+                )
+                obj.weight = max_weight + 10
+
+        super().save_model(request, obj, form, change)
+        # Clear cache on save
+        cache.delete("button_tree_cache")
 
 
 # Optional: Keep the separate admins for individual management
