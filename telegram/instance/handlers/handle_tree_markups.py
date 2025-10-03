@@ -298,68 +298,333 @@ PHOTO_MAX_BYTES = 10 * 1024 * 1024
 
 async def send_full_attachment(
     message: types.Message,
-    attachment,
+    attachment,  # This is AttachmentToButton instance
     bot: Bot,
     buttons: Optional[types.ReplyKeyboardMarkup] = None,
     fallback_text: Optional[str] = None,
 ):
     """
     Sends the attachment linked to a ButtonTree node with proper text and media limits.
-    Only includes captions when there's actual text content.
+    Handles all edge cases including mixed media, large files, and errors.
     """
+    try:
+        # Choose base text and make it safe
+        att_text = (attachment.text or "").strip()
+        base_text = att_text if att_text else (fallback_text or "")
+        base_text = safe_telegram_html(base_text.strip())
 
-    # Choose base text and make it safe
-    att_text = (attachment.text or "").strip()
-    base_text = att_text if att_text else (fallback_text or "")
-    base_text = safe_telegram_html(base_text.strip())
-
-    def split_long_text(text: str, max_length: int = 4096) -> list[str]:
-        """Split text into chunks that don't exceed max_length."""
-        if len(text) <= max_length:
-            return [text]
-        chunks = []
-        while text:
+        def split_long_text(text: str, max_length: int = 4096) -> list[str]:
+            """Split text into chunks that don't exceed max_length."""
             if len(text) <= max_length:
-                chunks.append(text)
-                break
-            split_pos = text.rfind(" ", 0, max_length)
-            if split_pos == -1:
-                split_pos = max_length
-            chunks.append(text[:split_pos])
-            text = text[split_pos:].strip()
-        return chunks
+                return [text]
+            chunks = []
+            while text:
+                if len(text) <= max_length:
+                    chunks.append(text)
+                    break
+                split_pos = text.rfind(" ", 0, max_length)
+                if split_pos == -1:
+                    split_pos = max_length
+                chunks.append(text[:split_pos])
+                text = text[split_pos:].strip()
+            return chunks
 
-    def get_caption_for_media(text: str) -> Optional[str]:
-        """Get caption for media only if text exists and fits limit."""
-        return safe_telegram_html(text) if text and len(text) <= 1024 else None
+        def get_caption_for_media(text: str) -> Optional[str]:
+            """Get caption for media only if text exists and fits limit."""
+            return safe_telegram_html(text) if text and len(text) <= 1024 else None
 
-    # TEXT-only case
-    if attachment.source_type == attachment.TEXT:
-        if base_text:
-            text_chunks = split_long_text(base_text)
-            for i, chunk in enumerate(text_chunks):
-                is_last = i == len(text_chunks) - 1
-                await message.answer(
-                    chunk,
-                    reply_markup=buttons if is_last else None,
-                    parse_mode=ParseMode.HTML,
+        # TEXT-only case
+        if attachment.source_type == AttachmentToButton.TEXT:
+            if base_text:
+                text_chunks = split_long_text(base_text)
+                for i, chunk in enumerate(text_chunks):
+                    is_last = i == len(text_chunks) - 1
+                    await message.answer(
+                        chunk,
+                        reply_markup=buttons if is_last else None,
+                        parse_mode=ParseMode.HTML,
+                    )
+            elif buttons:
+                await message.answer("Выберите действие:", reply_markup=buttons)
+            return
+
+        # Collect files with error handling
+        files: list[AttachmentData] = []
+        try:
+            # Correct way to get related files
+            files = [data_item async for data_item in attachment.data.all()]
+        except Exception as e:
+            logger.error(f"Error loading files for attachment {attachment.id}: {e}")
+            await message.answer(
+                "Ошибка загрузки файлов. Пожалуйста, попробуйте позже."
+            )
+            return
+
+        if not files:
+            # No files case
+            if base_text:
+                text_chunks = split_long_text(base_text)
+                for i, chunk in enumerate(text_chunks):
+                    is_last = i == len(text_chunks) - 1
+                    await message.answer(
+                        chunk,
+                        reply_markup=buttons if is_last else None,
+                        parse_mode=ParseMode.HTML,
+                    )
+            elif buttons:
+                await message.answer("Выберите действие:", reply_markup=buttons)
+            return
+
+        # Helper function to validate and prepare file
+        async def prepare_file(attachment_data: AttachmentData) -> Optional[dict]:
+            """Validate file and return file info or None if invalid."""
+            try:
+                # Correct way to access file path in Django
+                if not attachment_data.source:
+                    logger.warning(
+                        f"No file attached to AttachmentData {attachment_data.id}"
+                    )
+                    return None
+
+                path = attachment_data.source.path
+
+                # Check if file exists and is accessible
+                if not os.path.exists(path):
+                    logger.warning(f"File not found: {path}")
+                    return None
+
+                # Check file size
+                file_size = os.path.getsize(path)
+                if file_size == 0:
+                    logger.warning(f"Empty file: {path}")
+                    return None
+
+                # Check file permissions
+                if not os.access(path, os.R_OK):
+                    logger.warning(f"No read permissions for file: {path}")
+                    return None
+
+                ext = os.path.splitext(attachment_data.source.name)[1].lower()
+
+                return {
+                    "attachment_data": attachment_data,
+                    "path": path,
+                    "ext": ext,
+                    "size": file_size,
+                    "type": (
+                        "image"
+                        if ext in IMAGE_EXTS
+                        else "video" if ext in VIDEO_EXTS else "document"
+                    ),
+                    "filename": os.path.basename(attachment_data.source.name),
+                }
+            except Exception as e:
+                logger.error(
+                    f"Error preparing file {getattr(attachment_data, 'source', 'unknown')}: {e}"
                 )
-        elif buttons:
-            await message.answer("Выберите действие:", reply_markup=buttons)
-        return
+                return None
 
-    # Collect files
-    files: list[AttachmentData] = [
-        data_item async for data_item in attachment.data.all()
-    ]
+        # Helper function to send media groups by type
+        async def send_media_groups_by_type(
+            valid_files: list[dict], caption_text: Optional[str] = None
+        ):
+            """Send media files grouped by type (photos together, videos together)."""
+            if not valid_files:
+                return
 
-    # FILE: send documents with proper caption handling
-    if attachment.source_type == attachment.FILE:
-        # Send text first if it exists
+            # Separate files by type
+            photos = [
+                f
+                for f in valid_files
+                if f["type"] == "image" and f["size"] <= PHOTO_MAX_BYTES
+            ]
+            videos = [f for f in valid_files if f["type"] == "video"]
+            documents = [
+                f
+                for f in valid_files
+                if f["type"] == "document"
+                or (f["type"] == "image" and f["size"] > PHOTO_MAX_BYTES)
+            ]
+
+            sent_count = 0
+            total_files = len(valid_files)
+            caption_used = False
+
+            # Send photos as media groups
+            for start in range(0, len(photos), TELEGRAM_MEDIA_GROUP_LIMIT):
+                chunk = photos[start : start + TELEGRAM_MEDIA_GROUP_LIMIT]
+                if len(chunk) > 1:
+                    mg = MediaGroupBuilder()
+                    for i, file_info in enumerate(chunk):
+                        is_last = sent_count + i == total_files - 1
+                        current_caption = (
+                            caption_text
+                            if is_last and caption_text and not caption_used
+                            else None
+                        )
+                        if current_caption:
+                            caption_used = True
+
+                        mg.add_photo(
+                            media=FSInputFile(file_info["path"]),
+                            caption=current_caption,
+                        )
+
+                    try:
+                        await bot.send_media_group(
+                            chat_id=message.chat.id, media=mg.build()
+                        )
+                        sent_count += len(chunk)
+                    except Exception as e:
+                        logger.error(f"Error sending photo group: {e}")
+                        # Fallback: send individually
+                        for file_info in chunk:
+                            await send_single_file(
+                                file_info,
+                                (
+                                    caption_text
+                                    if sent_count == total_files - 1
+                                    and not caption_used
+                                    else None
+                                ),
+                            )
+                            sent_count += 1
+                else:
+                    for file_info in chunk:
+                        is_last = sent_count == total_files - 1
+                        await send_single_file(
+                            file_info,
+                            caption_text if is_last and not caption_used else None,
+                        )
+                        if is_last and caption_text:
+                            caption_used = True
+                        sent_count += 1
+
+            # Send videos as media groups (separate from photos)
+            for start in range(0, len(videos), TELEGRAM_MEDIA_GROUP_LIMIT):
+                chunk = videos[start : start + TELEGRAM_MEDIA_GROUP_LIMIT]
+                if len(chunk) > 1:
+                    mg = MediaGroupBuilder()
+                    for i, file_info in enumerate(chunk):
+                        is_last = sent_count + i == total_files - 1
+                        current_caption = (
+                            caption_text
+                            if is_last and caption_text and not caption_used
+                            else None
+                        )
+                        if current_caption:
+                            caption_used = True
+
+                        thumbnail = None
+                        if file_info["attachment_data"].thumbnail:
+                            try:
+                                thumbnail_path = file_info[
+                                    "attachment_data"
+                                ].thumbnail.path
+                                if os.path.exists(thumbnail_path):
+                                    thumbnail = FSInputFile(thumbnail_path)
+                            except Exception as e:
+                                logger.warning(
+                                    f"Could not load thumbnail for {file_info['filename']}: {e}"
+                                )
+
+                        mg.add_video(
+                            media=FSInputFile(file_info["path"]),
+                            thumbnail=thumbnail,
+                            caption=current_caption,
+                        )
+
+                    try:
+                        await bot.send_media_group(
+                            chat_id=message.chat.id, media=mg.build()
+                        )
+                        sent_count += len(chunk)
+                    except Exception as e:
+                        logger.error(f"Error sending video group: {e}")
+                        # Fallback: send individually
+                        for file_info in chunk:
+                            await send_single_file(
+                                file_info,
+                                (
+                                    caption_text
+                                    if sent_count == total_files - 1
+                                    and not caption_used
+                                    else None
+                                ),
+                            )
+                            sent_count += 1
+                else:
+                    for file_info in chunk:
+                        is_last = sent_count == total_files - 1
+                        await send_single_file(
+                            file_info,
+                            caption_text if is_last and not caption_used else None,
+                        )
+                        if is_last and caption_text:
+                            caption_used = True
+                        sent_count += 1
+
+            # Send documents individually (can't be grouped)
+            for file_info in documents:
+                is_last = sent_count == total_files - 1
+                await send_single_file(
+                    file_info, caption_text if is_last and not caption_used else None
+                )
+                if is_last and caption_text:
+                    caption_used = True
+                sent_count += 1
+
+        # Helper function to send single file
+        async def send_single_file(file_info: dict, caption: Optional[str] = None):
+            """Send a single file with proper method based on type and size."""
+            try:
+                if (
+                    file_info["type"] == "image"
+                    and file_info["size"] <= PHOTO_MAX_BYTES
+                ):
+                    await bot.send_photo(
+                        chat_id=message.chat.id,
+                        photo=FSInputFile(file_info["path"]),
+                        caption=caption,
+                        parse_mode=ParseMode.HTML if caption else None,
+                    )
+                elif file_info["type"] == "video":
+                    thumbnail = None
+                    if file_info["attachment_data"].thumbnail:
+                        try:
+                            thumbnail_path = file_info["attachment_data"].thumbnail.path
+                            if os.path.exists(thumbnail_path):
+                                thumbnail = FSInputFile(thumbnail_path)
+                        except Exception as e:
+                            logger.warning(
+                                f"Could not load thumbnail for {file_info['filename']}: {e}"
+                            )
+
+                    await bot.send_video(
+                        chat_id=message.chat.id,
+                        video=FSInputFile(file_info["path"]),
+                        thumbnail=thumbnail,
+                        caption=caption,
+                        parse_mode=ParseMode.HTML if caption else None,
+                    )
+                else:
+                    # Document or large image
+                    await bot.send_document(
+                        chat_id=message.chat.id,
+                        document=FSInputFile(file_info["path"]),
+                        caption=caption,
+                        parse_mode=ParseMode.HTML if caption else None,
+                    )
+            except Exception as e:
+                logger.error(f"Error sending file {file_info['path']}: {e}")
+                await message.answer(
+                    f"Ошибка отправки файла. Файл: {file_info['filename']}"
+                )
+
+        # Handle text first for all media types
         text_chunks = split_long_text(base_text)
         media_caption = get_caption_for_media(base_text)
 
-        # If text exists, send it as separate messages first
         text_sent_separately = False
         if base_text:
             for chunk in text_chunks:
@@ -367,295 +632,32 @@ async def send_full_attachment(
             media_caption = None  # Don't use caption after sending text separately
             text_sent_separately = True
 
-        # Send documents without captions if no text
-        for idx, item in enumerate(files):
-            path = item.source.path
-            # Only use caption for the last item if we have text and didn't send separately
-            caption = (
-                media_caption
-                if idx == len(files) - 1 and media_caption and not text_sent_separately
-                else None
-            )
+        # Prepare and validate all files
+        valid_files = []
+        for attachment_data in files:
+            file_info = await prepare_file(attachment_data)
+            if file_info:
+                valid_files.append(file_info)
+            else:
+                logger.warning(
+                    f"Skipping invalid file: {getattr(attachment_data, 'source', 'unknown')}"
+                )
 
-            await bot.send_document(
-                chat_id=message.chat.id,
-                document=FSInputFile(path),
-                caption=caption,
-                parse_mode=ParseMode.HTML if caption else None,
-            )
+        if not valid_files:
+            await message.answer("Нет доступных файлов для отправки.")
+            if buttons:
+                await message.answer("Выберите действие:", reply_markup=buttons)
+            return
+
+        # Send all valid files
+        await send_media_groups_by_type(valid_files, media_caption)
 
         # Send buttons at the end
         if buttons:
-            if text_sent_separately or files:
-                await message.answer("Выберите действие:", reply_markup=buttons)
-            else:
-                await message.answer("Выберите действие:", reply_markup=buttons)
-        return
-
-    # VIDEO_IMAGE_FILE: mixed media types
-    if attachment.source_type == attachment.VIDEO_IMAGE_FILE:
-        if not files:
-            if base_text:
-                text_chunks = split_long_text(base_text)
-                for i, chunk in enumerate(text_chunks):
-                    is_last = i == len(text_chunks) - 1
-                    await message.answer(
-                        chunk,
-                        reply_markup=buttons if is_last else None,
-                        parse_mode=ParseMode.HTML,
-                    )
-            elif buttons:
-                await message.answer("Выберите действие:", reply_markup=buttons)
-            return
-
-        # Separate files from media
-        file_items = []
-        media_items = []
-
-        for item in files:
-            path = item.source.path
-            ext = os.path.splitext(path)[1].lower()
-            if ext in IMAGE_EXTS or ext in VIDEO_EXTS:
-                media_items.append(item)
-            else:
-                file_items.append(item)
-
-        # Handle text - send text first if it exists
-        text_chunks = split_long_text(base_text)
-        media_caption = get_caption_for_media(base_text)
-
-        text_sent_separately = False
-        if base_text:
-            for chunk in text_chunks:
-                await message.answer(chunk, parse_mode=ParseMode.HTML)
-            text_sent_separately = True
-
-        # Send files first
-        if file_items:
-            for item in file_items:
-                path = item.source.path
-                await bot.send_document(
-                    chat_id=message.chat.id,
-                    document=FSInputFile(path),
-                )
-
-        # Send media items
-        media_was_sent = False
-        if media_items:
-            total_media = len(media_items)
-            caption_used = False
-            media_was_sent = True
-
-            for start in range(0, total_media, TELEGRAM_MEDIA_GROUP_LIMIT):
-                chunk = media_items[start : start + TELEGRAM_MEDIA_GROUP_LIMIT]
-                mg = MediaGroupBuilder()
-
-                for i, item in enumerate(chunk):
-                    path = item.source.path
-                    ext = os.path.splitext(path)[1].lower()
-                    is_global_last = start + i == total_media - 1
-
-                    # Only use caption if we have text and it's the last item
-                    caption_text = (
-                        media_caption
-                        if is_global_last
-                        and media_caption
-                        and not caption_used
-                        and not text_sent_separately
-                        else None
-                    )
-                    if caption_text:
-                        caption_used = True
-
-                    if ext in IMAGE_EXTS:
-                        size = os.path.getsize(path)
-                        if size > PHOTO_MAX_BYTES:
-                            await bot.send_document(
-                                chat_id=message.chat.id,
-                                document=FSInputFile(path),
-                                caption=caption_text,
-                                parse_mode=ParseMode.HTML if caption_text else None,
-                            )
-                        else:
-                            mg.add_photo(
-                                media=FSInputFile(path),
-                                caption=caption_text,
-                            )
-                    elif ext in VIDEO_EXTS:
-                        thumbnail = None
-                        if item.thumbnail:
-                            thumbnail = FSInputFile(item.thumbnail.path)
-                        mg.add_video(
-                            media=FSInputFile(path),
-                            thumbnail=thumbnail,
-                            caption=caption_text,
-                        )
-
-                # Send media group
-                media_group = mg.build()
-                if len(media_group) >= 2:
-                    await bot.send_media_group(
-                        chat_id=message.chat.id, media=media_group
-                    )
-                elif len(media_group) == 1:
-                    single_media = media_group[0]
-                    if single_media.type == "photo":
-                        await bot.send_photo(
-                            chat_id=message.chat.id,
-                            photo=single_media.media,
-                            caption=single_media.caption,
-                            parse_mode=ParseMode.HTML if single_media.caption else None,
-                        )
-                    elif single_media.type == "video":
-                        item_idx = start
-                        if item_idx < len(media_items):
-                            current_item = media_items[item_idx]
-                            thumbnail = None
-                            if current_item.thumbnail:
-                                thumbnail = FSInputFile(current_item.thumbnail.path)
-                        await bot.send_video(
-                            chat_id=message.chat.id,
-                            video=single_media.media,
-                            thumbnail=thumbnail,
-                            caption=single_media.caption,
-                            parse_mode=ParseMode.HTML if single_media.caption else None,
-                        )
-
-        # Send buttons
-        if buttons and (text_sent_separately or file_items or media_was_sent):
             await message.answer("Выберите действие:", reply_markup=buttons)
-        elif buttons:
+
+    except Exception as e:
+        logger.error(f"Unexpected error in send_full_attachment: {e}", exc_info=True)
+        await message.answer("Произошла непредвиденная ошибка при отправке материалов.")
+        if buttons:
             await message.answer("Выберите действие:", reply_markup=buttons)
-        return
-
-    # IMAGE or VIDEO (homogeneous media)
-    if attachment.source_type in {attachment.IMAGE, attachment.VIDEO}:
-        if not files:
-            if base_text:
-                text_chunks = split_long_text(base_text)
-                for i, chunk in enumerate(text_chunks):
-                    is_last = i == len(text_chunks) - 1
-                    await message.answer(
-                        chunk,
-                        reply_markup=buttons if is_last else None,
-                        parse_mode=ParseMode.HTML,
-                    )
-            elif buttons:
-                await message.answer("Выберите действие:", reply_markup=buttons)
-            return
-
-        text_chunks = split_long_text(base_text)
-        media_caption = get_caption_for_media(base_text)
-
-        text_sent_separately = False
-        if base_text:
-            for chunk in text_chunks:
-                await message.answer(chunk, parse_mode=ParseMode.HTML)
-            text_sent_separately = True
-
-        # Send media without captions if text was sent separately
-        total_files = len(files)
-        caption_used = False
-        media_was_sent = False
-
-        for start in range(0, total_files, TELEGRAM_MEDIA_GROUP_LIMIT):
-            chunk = files[start : start + TELEGRAM_MEDIA_GROUP_LIMIT]
-            media_was_sent = True
-
-            if len(chunk) > 1:
-                mg = MediaGroupBuilder()
-                for i, item in enumerate(chunk):
-                    path = item.source.path
-                    is_global_last = start + i == total_files - 1
-
-                    # Only use caption if we have text and it's not sent separately
-                    caption_text = (
-                        media_caption
-                        if is_global_last
-                        and media_caption
-                        and not caption_used
-                        and not text_sent_separately
-                        else None
-                    )
-                    if caption_text:
-                        caption_used = True
-
-                    if attachment.source_type == attachment.IMAGE:
-                        mg.add_photo(
-                            media=FSInputFile(path),
-                            caption=caption_text,
-                        )
-                    else:  # VIDEO
-                        thumbnail = None
-                        if item.thumbnail:
-                            thumbnail = FSInputFile(item.thumbnail.path)
-                        mg.add_video(
-                            media=FSInputFile(path),
-                            thumbnail=thumbnail,
-                            caption=caption_text,
-                        )
-                await bot.send_media_group(chat_id=message.chat.id, media=mg.build())
-            else:
-                item = chunk[0]
-                path = item.source.path
-                is_global_last = start == total_files - 1
-                caption_text = (
-                    media_caption
-                    if is_global_last
-                    and media_caption
-                    and not caption_used
-                    and not text_sent_separately
-                    else None
-                )
-                if caption_text:
-                    caption_used = True
-
-                if attachment.source_type == attachment.IMAGE:
-                    await bot.send_photo(
-                        chat_id=message.chat.id,
-                        photo=FSInputFile(path),
-                        caption=caption_text,
-                        parse_mode=ParseMode.HTML if caption_text else None,
-                    )
-                else:  # VIDEO
-                    thumbnail = None
-                    if item.thumbnail:
-                        thumbnail = FSInputFile(item.thumbnail.path)
-                    await bot.send_video(
-                        chat_id=message.chat.id,
-                        video=FSInputFile(path),
-                        thumbnail=thumbnail,
-                        caption=caption_text,
-                        parse_mode=ParseMode.HTML if caption_text else None,
-                    )
-
-        # Send buttons
-        if buttons and (text_sent_separately or media_was_sent):
-            await message.answer("Выберите действие:", reply_markup=buttons)
-        elif buttons:
-            await message.answer("Выберите действие:", reply_markup=buttons)
-        return
-
-    # VIDEO_IMAGE (mixed)
-    if attachment.source_type == attachment.VIDEO_IMAGE:
-        await send_full_attachment(
-            message,
-            attachment,
-            bot,
-            buttons,
-            fallback_text,
-        )
-        return
-
-    # Fallback for unhandled types
-    if base_text:
-        text_chunks = split_long_text(base_text)
-        for i, chunk in enumerate(text_chunks):
-            is_last = i == len(text_chunks) - 1
-            await message.answer(
-                chunk,
-                reply_markup=buttons if is_last else None,
-                parse_mode=ParseMode.HTML,
-            )
-    elif buttons:
-        await message.answer("Выберите действие:", reply_markup=buttons)
