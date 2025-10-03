@@ -69,19 +69,7 @@ services:
     depends_on: [redis]
     volumes:
       - .:/app
-  # Heavy tasks isolated
-  worker-slow:
-    build: .
-    command: >
-      celery -A core worker
-      --loglevel=INFO
-      --queues=slow
-      --concurrency=2
-      --prefetch-multiplier=1
-      --max-tasks-per-child=500
-      --autoscale=6,2
-    env_file: .env
-    depends_on: [redis]
+  
 
   # Scheduler (only one)
   beat:
