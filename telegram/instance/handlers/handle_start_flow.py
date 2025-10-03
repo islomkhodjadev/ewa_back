@@ -57,25 +57,41 @@ async def get_login_password(
     data = await state.get_data()
     await state.clear()
 
-    status_code, response_data = await login_post(
-        access_parameter=data["access_parameter"], password=data["password"]
-    )
+    try:
+        status_code, response_data = await login_post(
+            access_parameter=data["access_parameter"], password=data["password"]
+        )
+    except Exception as e:
+        print(f"❌ Error in login_post: {e}")  # Add logging
+        await message.answer(
+            "Произошла ошибка при авторизации. Пожалуйста, попробуйте позже."
+        )
+        await state.set_state(LoginFSM.access_parameter)
+        await message.delete()
+        return  # Important: return after error
 
     if status_code == 200:
-        first_name, last_name = await fill_and_activate_user(
-            response_data, message.from_user.id
-        )
-        start_button = inline_markup_builder(
-            [InlineButton(text="start", callback_data="start")]
-        )
-        await message.answer(
-            f"Добро пожаловать, {last_name}  {first_name}!"
-            "Я – EWA_assistant AI, твой персональный AI – ассистент в партнерстве с EWA PRODUCT.\n"
-            "Не пью кофе, не устаю и не ухожу в отпуск – всегда на связи, что бы прокачать тебя в продукте и бизнесе.\n"
-            "Нужны ответы быстро и по делу? – уже бегу!\n"
-            "А, перед началом нашей беседы, предлагаю тебе ответить на пару вопросов, что бы я лучше узнал тебя!",
-            reply_markup=start_button,
-        )
+        try:
+            first_name, last_name = await fill_and_activate_user(
+                response_data, message.from_user.id
+            )
+            start_button = inline_markup_builder(
+                [InlineButton(text="start", callback_data="start")]
+            )
+            await message.answer(
+                f"Добро пожаловать, {last_name}  {first_name}!"
+                "Я – EWA_assistant AI, твой персональный AI – ассистент в партнерстве с EWA PRODUCT.\n"
+                "Не пью кофе, не устаю и не ухожу в отпуск – всегда на связи, что бы прокачать тебя в продукте и бизнесе.\n"
+                "Нужны ответы быстро и по делу? – уже бегу!\n"
+                "А, перед началом нашей беседы, предлагаю тебе ответить на пару вопросов, что бы я лучше узнал тебя!",
+                reply_markup=start_button,
+            )
+        except Exception as e:
+            print(f"❌ Error in fill_and_activate_user: {e}")
+            await message.answer(
+                "Ошибка при обработке данных пользователя. Пожалуйста, попробуйте снова."
+            )
+            await state.set_state(LoginFSM.access_parameter)
 
     else:
         await message.answer(
