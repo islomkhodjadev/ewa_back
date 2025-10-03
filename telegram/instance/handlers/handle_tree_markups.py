@@ -344,8 +344,8 @@ async def send_full_attachment(
                         reply_markup=buttons if is_last else None,
                         parse_mode=ParseMode.HTML,
                     )
-            elif buttons:
-                await message.answer("Выберите действие:", reply_markup=buttons)
+            # elif buttons:
+            #     await message.answer("Выберите действие:", reply_markup=buttons)
             return
 
         # Collect files with error handling
@@ -371,8 +371,8 @@ async def send_full_attachment(
                         reply_markup=buttons if is_last else None,
                         parse_mode=ParseMode.HTML,
                     )
-            elif buttons:
-                await message.answer("Выберите действие:", reply_markup=buttons)
+            # elif buttons:
+            #     await message.answer("Выберите действие:", reply_markup=buttons)
             return
 
         # Helper function to validate and prepare file
@@ -653,8 +653,8 @@ async def send_full_attachment(
         await send_media_groups_by_type(valid_files, media_caption)
 
         # Send buttons at the end
-        if buttons:
-            await message.answer("Выберите действие:", reply_markup=buttons)
+        # if buttons:
+        #     await message.answer("Выберите действие:", reply_markup=buttons)
 
     except Exception as e:
         logger.error(f"Unexpected error in send_full_attachment: {e}", exc_info=True)
