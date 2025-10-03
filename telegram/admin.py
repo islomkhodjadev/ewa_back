@@ -87,9 +87,6 @@ class ButtonTreeAdmin(ModelAdmin):
     list_editable = ("weight",)  # Allow direct editing in list view
     list_per_page = 50
 
-    # Add custom admin views
-    change_list_template = "admin/buttontree_change_list.html"
-
     # This is the key - both levels nested under ButtonTree
     inlines = [AttachmentToButtonInline]
 
