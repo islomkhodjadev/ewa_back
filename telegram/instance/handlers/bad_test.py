@@ -679,7 +679,7 @@ async def handle_back_in_test(message: types.Message, state: FSMContext):
                     keyboard=[
                         [KeyboardButton(text="1,3,5"), KeyboardButton(text="2,4,6")],
                         [KeyboardButton(text="1,2,3"), KeyboardButton(text="4,5,6")],
-                        [KeyboardButton(text="7"), KeyboardButton(text="1,4,7")],
+                        [KeyboardButton(text="7,5,6"), KeyboardButton(text="1,4,7")],
                         [KeyboardButton(text="⬅️ Назад")],
                     ],
                 )
