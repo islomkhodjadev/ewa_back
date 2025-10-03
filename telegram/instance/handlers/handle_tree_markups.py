@@ -7,7 +7,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 from telegram.instance.filters.tree_filter import TreeButtonsOnly
 from telegram.instance.middlewares import BotClientSessionMiddleWare
-from telegram.models.buttonTree import AttachmentData
+from telegram.models.buttonTree import AttachmentData, AttachmentToButton
 from telegram_client.models import BotClientSession, BotClient
 from telegram.models import ButtonTree
 from telegram.instance.markup_buttons import reply_markup_builder_from_model
