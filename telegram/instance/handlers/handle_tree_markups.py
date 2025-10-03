@@ -12,6 +12,8 @@ from telegram_client.models import BotClientSession, BotClient
 from telegram.models import ButtonTree
 from telegram.instance.markup_buttons import reply_markup_builder_from_model
 import logging
+import re
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,32 @@ tree_router = Router()
 tree_router.message.outer_middleware(BotClientSessionMiddleWare())
 
 BACK_BTN = "⬅️ Назад"
+
+# Pre-compile patterns for maximum speed
+_VALID_TAGS_PATTERN = re.compile(
+    r"</?(b|strong|i|em|u|ins|s|strike|del|code|pre|a|tg-spoiler|tg-emoji)[^>]*>"
+)
+_PROBLEMATIC_LT_PATTERN = re.compile(
+    r"<(?![a-z/])"
+)  # Match < not followed by letter or /
+
+
+def safe_telegram_html(text: str) -> str:
+    """
+    Ultra-fast HTML sanitizer that preserves ONLY Telegram-allowed HTML tags
+    and escapes everything else that could break parsing.
+    """
+    if not text:
+        return text
+
+    # Replace all < that are not part of valid Telegram HTML tags
+    def escape_invalid_lt(match):
+        return "&lt;"
+
+    # First escape all problematic < characters
+    safe_text = _PROBLEMATIC_LT_PATTERN.sub(escape_invalid_lt, text)
+
+    return safe_text
 
 
 def back_keyboard() -> ReplyKeyboardMarkup:
@@ -48,7 +76,9 @@ async def give_parent_tree(message: types.Message, bot: Bot, from_back: bool = F
 
     # First entry
     return await message.answer(
-        "Готово! Теперь вы можете пользоваться всеми функциями бота.",
+        safe_telegram_html(
+            "Готово! Теперь вы можете пользоваться всеми функциями бота."
+        ),
         reply_markup=buttons,
         parse_mode=ParseMode.HTML,
     )
@@ -86,7 +116,9 @@ async def use_tree(
             extra_buttons=[BACK_BTN],
         )
         return await message.answer(
-            parent.text, reply_markup=buttons, parse_mode=ParseMode.HTML
+            safe_telegram_html(parent.text),
+            reply_markup=buttons,
+            parse_mode=ParseMode.HTML,
         )
 
     # 1) User is at root and selects a top-level node
@@ -114,7 +146,7 @@ async def use_tree(
                     fallback_text=next_button.text,
                 )
             return await message.answer(
-                next_button.text,
+                safe_telegram_html(next_button.text),
                 reply_markup=back_keyboard(),
                 parse_mode=ParseMode.HTML,
             )
@@ -137,13 +169,13 @@ async def use_tree(
                 fallback_text=next_button.text,
             )
             return await message.answer(
-                next_button.text,
+                safe_telegram_html(next_button.text),
                 reply_markup=buttons,
                 parse_mode=ParseMode.HTML,
             )
 
         return await message.answer(
-            next_button.text,
+            safe_telegram_html(next_button.text),
             reply_markup=buttons,
             parse_mode=ParseMode.HTML,
         )
@@ -188,7 +220,7 @@ async def use_tree(
                     fallback_text=next_button.text,
                 )
             return await message.answer(
-                next_button.text,
+                safe_telegram_html(next_button.text),
                 reply_markup=back_keyboard(),
                 parse_mode=ParseMode.HTML,
             )
@@ -211,13 +243,13 @@ async def use_tree(
                 fallback_text=next_button.text,
             )
             return await message.answer(
-                next_button.text,
+                safe_telegram_html(next_button.text),
                 reply_markup=buttons,
                 parse_mode=ParseMode.HTML,
             )
 
         return await message.answer(
-            next_button.text,
+            safe_telegram_html(next_button.text),
             reply_markup=buttons,
             parse_mode=ParseMode.HTML,
         )
@@ -250,11 +282,9 @@ def can_use_media_group(media_count: int) -> bool:
 
 # --- helpers/attachments.py ---------------------------------------------------
 from typing import Optional
-
 from aiogram import types
 from aiogram.types import FSInputFile
 from aiogram.utils.media_group import MediaGroupBuilder
-import os
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
@@ -278,10 +308,10 @@ async def send_full_attachment(
     Only includes captions when there's actual text content.
     """
 
-    # Choose base text
+    # Choose base text and make it safe
     att_text = (attachment.text or "").strip()
     base_text = att_text if att_text else (fallback_text or "")
-    base_text = base_text.strip()
+    base_text = safe_telegram_html(base_text.strip())
 
     def split_long_text(text: str, max_length: int = 4096) -> list[str]:
         """Split text into chunks that don't exceed max_length."""
@@ -301,7 +331,7 @@ async def send_full_attachment(
 
     def get_caption_for_media(text: str) -> Optional[str]:
         """Get caption for media only if text exists and fits limit."""
-        return text if text and len(text) <= 1024 else None
+        return safe_telegram_html(text) if text and len(text) <= 1024 else None
 
     # TEXT-only case
     if attachment.source_type == attachment.TEXT:
