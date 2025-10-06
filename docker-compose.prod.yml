@@ -1,8 +1,5 @@
-version: "3.9"
-
 services:
   backend:
-    container_name: ewa_backend_django
     build: .
     ports:
       - "8000-8002:8000"   # Multiple ports for load balancing
@@ -21,10 +18,10 @@ services:
       - db
       - redis
     deploy:
-      replicas: 3              # Multiple backend instances
+      replicas: 3
       resources:
         limits:
-          memory: 1G           # Lightweight - no model loaded
+          memory: 1G
           cpus: "0.7"
     command:
       - sh
@@ -38,7 +35,6 @@ services:
         --workers 2
         --threads 2
         --timeout 120
-
     volumes:
       - ./static:/app/static
       - ./media:/app/media
@@ -52,13 +48,13 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_MAX_CONNECTIONS: 200    # Increased connections
+      POSTGRES_MAX_CONNECTIONS: 200
     volumes:
       - db_data:/var/lib/postgresql/data
     deploy:
       resources:
         limits:
-          memory: 4G           # More memory for vector operations
+          memory: 4G
           cpus: "2.0"
 
   redis:
@@ -70,7 +66,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G           # More Redis memory for queues
+          memory: 2G
           cpus: "0.5"
 
   # Fast workers for E5 embeddings - optimized for 8 cores
@@ -80,40 +76,28 @@ services:
       celery -A core worker
       --loglevel=INFO
       --queues=fast,default
-      --concurrency=6           # Higher concurrency per worker
+      --concurrency=6
       --prefetch-multiplier=1
       --max-tasks-per-child=200
-      --autoscale=8,4          # Optimized autoscale
+      --autoscale=8,4
     environment:
       - CELERY_WORKER=true
       - CELERYD_CONCURRENCY=6
-      - OMP_NUM_THREADS=1      # Optimize for multiple workers
+      - OMP_NUM_THREADS=1
     env_file: .env
     depends_on: [redis]
     volumes:
       - .:/app
     deploy:
-      replicas: 4              # More worker instances
+      replicas: 4
       resources:
         limits:
-          memory: 2.5G         # For E5 model + overhead
+          memory: 2.5G
           cpus: "1.2"
-
-  beat:
-    build: .
-    command: celery -A core beat --loglevel=INFO
-    env_file: .env
-    depends_on: [redis]
-    volumes:
-      - .:/app
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.2"
 
   flower:
     build: .
+    container_name: ewa_flower
     command: celery -A core flower --loglevel=INFO --port=5555
     env_file: .env
     depends_on: [redis]
