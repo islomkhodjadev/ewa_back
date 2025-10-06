@@ -71,21 +71,31 @@ class EmbeddingAdmin(ModelAdmin):
     #     super().save_model(request, obj, form, change)
 
     def save_model(self, request, obj, form, change):
+        # Save without embedding first
+        super().save_model(request, obj, form, change)
+
+        # Generate embedding async and update
         if getattr(obj, "embedded_vector", None) is None and obj.raw_text:
             from .tasks import create_embedding_task
+            from django.db import models
 
-            # Wait for result (up to 30 seconds timeout)
             try:
                 embedding_vector = create_embedding_task.apply_async(
                     args=[obj.raw_text]
                 ).get(timeout=30)
-                obj.embedded_vector = embedding_vector
+
+                # Use update() to directly save to database
+                type(obj).objects.filter(pk=obj.pk).update(
+                    embedded_vector=embedding_vector
+                )
+
+                # Refresh the instance
+                obj.refresh_from_db()
+
             except Exception as e:
                 self.message_user(
                     request, f"Embedding generation failed: {str(e)}", level="error"
                 )
-
-        super().save_model(request, obj, form, change)
 
 
 from .models import Utils
