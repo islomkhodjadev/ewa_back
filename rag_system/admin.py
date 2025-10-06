@@ -71,35 +71,35 @@ class EmbeddingAdmin(ModelAdmin):
     #     super().save_model(request, obj, form, change)
 
     def save_model(self, request, obj, form, change):
+        print(f"🔍 Admin save_model - ID: {obj.id}, Text: {obj.raw_text}")
+
         # Save the object first
         super().save_model(request, obj, form, change)
+        print(f"✅ Object saved - New ID: {obj.id}")
 
-        # Always regenerate embedding if text exists
-        # This ensures embeddings are always in sync with text
         if obj.raw_text:
-            from .tasks import create_embedding_task
+            print(f"🔄 Starting embedding task for ID: {obj.id}")
+            from .tasks import create_and_save_embedding_task
 
             try:
-                embedding_vector = create_embedding_task.apply_async(
-                    args=[obj.raw_text]
+                result = create_and_save_embedding_task.apply_async(
+                    args=[obj.id, obj.raw_text]
                 ).get(timeout=30)
+                print(f"✅ Task completed: {result}")
 
-                # Update the embedding
-                self.model.objects.filter(pk=obj.pk).update(
-                    embedded_vector=embedding_vector
-                )
+                # Refresh and verify
                 obj.refresh_from_db()
+                print(
+                    f"✅ Object refreshed - Has embedding: {obj.embedded_vector is not None}"
+                )
 
                 self.message_user(
-                    request,
-                    "Embedding generated and saved successfully!",
-                    level="success",
+                    request, "Embedding saved successfully!", level="success"
                 )
 
             except Exception as e:
-                self.message_user(
-                    request, f"Embedding generation failed: {str(e)}", level="error"
-                )
+                print(f"❌ Task failed: {e}")
+                self.message_user(request, f"Embedding failed: {str(e)}", level="error")
 
 
 from .models import Utils

@@ -313,3 +313,27 @@ def save_embedding_with_vector_task(embedding_id, raw_text):
     embedding_obj.save()
 
     return embedding_id
+
+
+# tasks.py
+@shared_task
+def create_and_save_embedding_task(embedding_id, raw_text):
+    """Create embedding and save it directly to the database"""
+    from rag_system.models import Embedding
+    from rag_system.utils.embeddings import get_embedding
+
+    try:
+        # Generate the embedding
+        embedding_vector = get_embedding(raw_text)
+
+        # Save directly to database
+        updated = Embedding.objects.filter(id=embedding_id).update(
+            embedded_vector=embedding_vector
+        )
+
+        print(f"✅ Embedding saved for ID {embedding_id}, rows updated: {updated}")
+        return f"Embedding saved for ID {embedding_id}"
+
+    except Exception as e:
+        print(f"❌ Failed to save embedding for ID {embedding_id}: {e}")
+        raise
