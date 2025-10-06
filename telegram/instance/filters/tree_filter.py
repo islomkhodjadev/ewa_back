@@ -4,15 +4,18 @@ from aiogram import types
 from telegram.models import ButtonTree
 from telegram_client.models import BotClientSession
 
+import logging
 
 BACK_BTN = "⬅️ Назад"
 
 
 EXCLUDE_TEXTS = {"Виртуальный помощник", "Личный кабинет"}
+logger = logging.getLogger(__name__)
 
 
 class TreeButtonsOnly(BaseFilter):
     async def __call__(self, message: types.Message, session: BotClientSession) -> bool:
+        logger.info("Tree button filter is working")
         text = (message.text or "").strip()
         if not text:
             return False
