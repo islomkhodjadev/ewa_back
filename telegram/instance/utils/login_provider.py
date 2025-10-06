@@ -6,7 +6,7 @@ from telegram_client.models import BotClient, BotClientSession
 async def login_post(access_parameter: str, password: str):
     async with httpx.AsyncClient() as session:
         response = await session.post(
-            "https://dev.ewaproduct.com/api/auth",
+            "https://ewaproduct.com/api/auth",
             json={"access_parameter": access_parameter, "password": password},
         )
         return response.status_code, response.json()
