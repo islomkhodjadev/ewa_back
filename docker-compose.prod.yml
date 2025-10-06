@@ -89,7 +89,7 @@ services:
     volumes:
       - .:/app
     deploy:
-      replicas: 4
+      replicas: 2
       resources:
         limits:
           memory: 2.5G
