@@ -43,6 +43,8 @@ class BotClientAdmin(ModelAdmin):
     list_display = (
         "id",
         "is_verified",
+        "ai_access",
+        "grade",
         "is_logined",
         "first_name",
         "client_id",
@@ -78,7 +80,7 @@ class BotClientAdmin(ModelAdmin):
         (
             "Статусы",
             {
-                "fields": ("is_verified", "is_logined"),
+                "fields": ("is_verified", "is_logined", "ai_access"),
             },
         ),
         (
@@ -94,6 +96,7 @@ class BotClientAdmin(ModelAdmin):
                     "client_id",
                     "first_name",
                     "last_name",
+                    "grade",
                     "username",
                     "phone_number",
                 ),
