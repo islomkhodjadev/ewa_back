@@ -15,9 +15,10 @@ class BotClient(models.Model):
     last_name = models.CharField(
         max_length=100, blank=True, null=True, verbose_name="👨‍👩‍👦 Фамилия"
     )
-
+    grade = models.CharField(max_length=220, default="GradePassivePartner")
     client_id = models.CharField(max_length=100, default="not set")
     phone_number = models.CharField(max_length=30, null=True, blank=True)
+    ai_access = models.BooleanField(default=False)
     username = models.CharField(
         max_length=100,
         blank=True,

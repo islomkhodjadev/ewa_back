@@ -51,7 +51,7 @@ class NotificationsConsumer(AsyncJsonWebsocketConsumer):
         bot = BotClient.objects.filter(chat_id=chat_id).only("id").first()
         if not bot:
             return None
-        if not bot.is_verified:
+        if not bot.is_verified or not bot.ai_access:
             return None
 
         session, _created = ChatSession.objects.get_or_create(bot_client=bot)

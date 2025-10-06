@@ -16,14 +16,22 @@ async def fill_and_activate_user(data, chat_id):
     phone_number = data["client_partner"]["main_user_data"]["phone"]
     first_name = data["client_partner"]["main_user_data"]["name"]
     last_name = data["client_partner"]["main_user_data"]["surname"]
+    grade = data["client_partner"]["main_user_data"]["grade"]
     id = data["client_partner"]["main_user_data"]["id"]
     bot_client = await BotClient.objects.filter(chat_id=chat_id).afirst()
+    await BotClient.objects.filter(client_id=id).exclude(chat_id=chat_id).aupdate(
+        ai_access=False
+    )
     await bot_client.aupdate_fields(
         is_logined=True,
         phone_number=phone_number,
         first_name=first_name,
         last_name=last_name,
         client_id=id,
+        grade=grade,
+        ai_access=(
+            True if grade not in ["GradeClient", "GradePassivePartner"] else False
+        ),
     )
     session = await BotClientSession.objects.filter(client=bot_client).afirst()
     if session:
