@@ -37,6 +37,11 @@ def _is_primary_process():
     return True
 
 
+def _is_celery_worker():
+    """Check if this is a Celery worker using env variable"""
+    return os.environ.get("CELERY_WORKER") == "true"
+
+
 class RagSystemConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "rag_system"
@@ -46,19 +51,19 @@ class RagSystemConfig(AppConfig):
 
         if _is_management_command():
             return
-        # Avoid double-run in dev autoreload
         if not _is_primary_process():
             return
 
-        # Warm-load once
+        # ONLY load model if CELERY_WORKER env var is set
+        if not _is_celery_worker():
+            return
+
+        # Load model only in workers
         try:
-            from rag_system.utils import (
-                get_embedding_model,
-            )  # wherever your function is
+            from rag_system.utils import get_embedding_model
 
             get_embedding_model()
         except Exception as exc:
-            # Log but don't crash the process on warmup
             import logging
 
             logging.getLogger(__name__).exception("Embedding warmup failed: %s", exc)

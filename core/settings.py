@@ -208,6 +208,8 @@ CELERY_TASK_ROUTES = {
     "rag_system.tasks.change_mode_to_skynet": {"queue": "fast"},
     "rag_system.tasks.change_mode_to_chat": {"queue": "fast"},
     "rag_system.tasks.entry_role": {"queue": "fast"},
+    "rag_system.tasks.create_embedding_task": {"queue": "fast"},
+    "rag_system.tasks.save_embedding_with_vector_task": {"queue": "fast"},
 }
 
 CELERY_TASK_QUEUES = {

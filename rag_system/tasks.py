@@ -286,3 +286,30 @@ def entry_role(self, prompt, group, session_id, role_id):
             },
         )
         raise
+
+
+# Add to your tasks.py
+@shared_task
+def create_embedding_task(raw_text):
+    """Create embedding in worker and return the vector"""
+    from rag_system.utils.embeddings import get_embedding
+
+    return get_embedding(raw_text)
+
+
+# tasks.py - Update the task to avoid signal loops
+@shared_task
+def save_embedding_with_vector_task(embedding_id, raw_text):
+    """Create embedding and save it to the model instance"""
+    from rag_system.models import Embedding
+    from rag_system.utils import get_embedding
+
+    embedding_vector = get_embedding(raw_text)
+
+    # Save to database - mark to avoid signal loop
+    embedding_obj = Embedding.objects.get(id=embedding_id)
+    embedding_obj._embedding_processing = True  # Prevent signal loop
+    embedding_obj.embedded_vector = embedding_vector
+    embedding_obj.save()
+
+    return embedding_id

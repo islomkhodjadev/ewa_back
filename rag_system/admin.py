@@ -60,14 +60,31 @@ class EmbeddingAdmin(ModelAdmin):
             )
         return format_html("<code>{}</code>", str(v)[:500])
 
+    # def save_model(self, request, obj, form, change):
+    #     if getattr(obj, "embedded_vector", None) is None and obj.raw_text:
+    #         vec = get_embedding(obj.raw_text)
+    #         try:
+    #             vec = vec.tolist()
+    #         except AttributeError:
+    #             pass
+    #         obj.embedded_vector = vec
+    #     super().save_model(request, obj, form, change)
+
     def save_model(self, request, obj, form, change):
         if getattr(obj, "embedded_vector", None) is None and obj.raw_text:
-            vec = get_embedding(obj.raw_text)
+            from .tasks import create_embedding_task
+
+            # Wait for result (up to 30 seconds timeout)
             try:
-                vec = vec.tolist()
-            except AttributeError:
-                pass
-            obj.embedded_vector = vec
+                embedding_vector = create_embedding_task.apply_async(
+                    args=[obj.raw_text]
+                ).get(timeout=30)
+                obj.embedded_vector = embedding_vector
+            except Exception as e:
+                self.message_user(
+                    request, f"Embedding generation failed: {str(e)}", level="error"
+                )
+
         super().save_model(request, obj, form, change)
 
 
