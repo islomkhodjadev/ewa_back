@@ -95,21 +95,6 @@ services:
           memory: 2.5G
           cpus: "1.2"
 
-  flower:
-    build: .
-    container_name: ewa_flower
-    command: celery -A core flower --loglevel=INFO --port=5555
-    env_file: .env
-    depends_on: [redis]
-    volumes:
-      - .:/app
-    ports:
-      - "5555:5555"
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.2"
 
 volumes:
   db_data:
