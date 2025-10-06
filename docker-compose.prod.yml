@@ -18,7 +18,7 @@ services:
       - db
       - redis
     deploy:
-      replicas: 2              # 2 backends is enough
+      replicas: 3             # 2 backends is enough
       resources:
         limits:
           memory: 800M         # Reduced - no model loaded
@@ -76,9 +76,10 @@ services:
       celery -A core worker
       --loglevel=INFO
       --queues=fast,default
-      --concurrency=3           # Moderate concurrency
+      --concurrency=3          
       --prefetch-multiplier=1
       --max-tasks-per-child=50
+
     environment:
       - CELERY_WORKER=true
       - CELERYD_CONCURRENCY=3
