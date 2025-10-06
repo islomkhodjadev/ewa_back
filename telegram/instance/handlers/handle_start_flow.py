@@ -167,7 +167,6 @@ async def onboarding_flow(message: types.Message, bot: Bot, state: context.FSMCo
                 ReplyButton(text="Дополнительный доход"),
                 ReplyButton(text="Развитие офлайн - бизнеса"),
                 ReplyButton(text="Выход на пассив"),
-                ReplyButton(text="Построение команды"),
                 ReplyButton(text="Развитие личного бренда"),
                 ReplyButton(text="Развитие онлайн - бизнеса"),
             ],
