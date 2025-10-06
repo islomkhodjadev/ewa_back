@@ -16,7 +16,7 @@ async def fill_and_activate_user(data, chat_id):
     phone_number = data["client_partner"]["main_user_data"]["phone"]
     first_name = data["client_partner"]["main_user_data"]["name"]
     last_name = data["client_partner"]["main_user_data"]["surname"]
-    grade = data["client_partner"]["main_user_data"]["grade"]
+    grade = data["client_partner"]["bonus_system_data"]["grade"]
     id = data["client_partner"]["main_user_data"]["id"]
     bot_client = await BotClient.objects.filter(chat_id=chat_id).afirst()
     await BotClient.objects.filter(client_id=id).exclude(chat_id=chat_id).aupdate(

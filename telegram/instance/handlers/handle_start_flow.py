@@ -89,7 +89,7 @@ async def get_login_password(
         except Exception as e:
             print(f"❌ Error in fill_and_activate_user: {e}")
             await message.answer(
-                "Ошибка при обработке данных пользователя. Пожалуйста, попробуйте снова."
+                "Ошибка при обработке данных пользователя. Пожалуйста, попробуйте снова, просто перезапустите его командой /start"
             )
             await state.set_state(LoginFSM.access_parameter)
 
