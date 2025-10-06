@@ -1,6 +1,6 @@
 import httpx
 import asyncio
-from telegram_client.models import BotClient
+from telegram_client.models import BotClient, BotClientSession
 
 
 async def login_post(access_parameter: str, password: str):
@@ -25,5 +25,9 @@ async def fill_and_activate_user(data, chat_id):
         last_name=last_name,
         client_id=id,
     )
+    session = await BotClientSession.objects.filter(client=bot_client).afirst()
+    if session:
+        session.current_button = None
+        await session.asave(update_fields=["current_button"])
 
     return first_name, last_name
