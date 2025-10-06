@@ -9,13 +9,15 @@ class BotClient(models.Model):
     chat_id = models.BigIntegerField(
         verbose_name="💬 ID чата", db_index=True, unique=True
     )
-    first_name = models.CharField(max_length=100, verbose_name="🧑 Имя")
+    first_name = models.CharField(
+        max_length=100, verbose_name="🧑 Имя", null=True, blank=True
+    )
     last_name = models.CharField(
         max_length=100, blank=True, null=True, verbose_name="👨‍👩‍👦 Фамилия"
     )
 
     client_id = models.CharField(max_length=100, default="not set")
-    phone_number = models.CharField(max_length=30)
+    phone_number = models.CharField(max_length=30, null=True, blank=True)
     username = models.CharField(
         max_length=100,
         blank=True,
