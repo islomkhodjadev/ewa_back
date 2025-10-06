@@ -71,31 +71,30 @@ class EmbeddingAdmin(ModelAdmin):
     #     super().save_model(request, obj, form, change)
 
     def save_model(self, request, obj, form, change):
-        # Save the object first (whether new or existing)
+        # Save the object first
         super().save_model(request, obj, form, change)
 
-        # Check if we need to generate/regenerate embedding
-        needs_embedding = obj.raw_text and (  # Text exists
-            not obj.embedded_vector  # No embedding yet
-            or change  # Existing object that might have updated text
-        )
-
-        if needs_embedding:
+        # Always regenerate embedding if text exists
+        # This ensures embeddings are always in sync with text
+        if obj.raw_text:
             from .tasks import create_embedding_task
-            from django.db import models
 
             try:
                 embedding_vector = create_embedding_task.apply_async(
                     args=[obj.raw_text]
                 ).get(timeout=30)
 
-                # Use update() to directly save to database
-                type(obj).objects.filter(pk=obj.pk).update(
+                # Update the embedding
+                self.model.objects.filter(pk=obj.pk).update(
                     embedded_vector=embedding_vector
                 )
-
-                # Refresh the instance
                 obj.refresh_from_db()
+
+                self.message_user(
+                    request,
+                    "Embedding generated and saved successfully!",
+                    level="success",
+                )
 
             except Exception as e:
                 self.message_user(
