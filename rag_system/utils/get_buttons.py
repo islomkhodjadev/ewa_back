@@ -4,7 +4,7 @@ from miniapp.models import ChatSession
 
 def get_buttons(session: ChatSession):
     if session.mode == ChatSession.SKYNET and session.current_role is not None:
-        return {"buttons": ["/ЧАТ"]}
+        return {"buttons": ["/ОЦЕНИТЬ"]}
     elif session.mode == ChatSession.SKYNET and session.current_role is None:
         return {
             "roles": [

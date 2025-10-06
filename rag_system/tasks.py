@@ -256,7 +256,7 @@ def entry_role(self, prompt, group, session_id, role_id):
             "answer": answer,
             "embedding": None,
             "task_id": self.request.id,
-            "buttons": ["/ЧАТ"],
+            "buttons": ["/ОЦЕНИТЬ"],
         }
 
         async_to_sync(channel_layer.group_send)(

@@ -109,7 +109,7 @@ class NotificationsConsumer(AsyncJsonWebsocketConsumer):
         logger.info(prompt)
         await self._create_message(self.chat_session_id, prompt, owner="user")
         group = self.group
-        if prompt == "/ЧАТ":
+        if prompt == "/ОЦЕНИТЬ":
             res = change_mode_to_chat.delay(
                 prompt=prompt, group=group, session_id=self.chat_session_id
             )
