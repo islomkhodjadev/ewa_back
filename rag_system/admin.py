@@ -71,11 +71,16 @@ class EmbeddingAdmin(ModelAdmin):
     #     super().save_model(request, obj, form, change)
 
     def save_model(self, request, obj, form, change):
-        # Save without embedding first
+        # Save the object first (whether new or existing)
         super().save_model(request, obj, form, change)
 
-        # Generate embedding async and update
-        if getattr(obj, "embedded_vector", None) is None and obj.raw_text:
+        # Check if we need to generate/regenerate embedding
+        needs_embedding = obj.raw_text and (  # Text exists
+            not obj.embedded_vector  # No embedding yet
+            or change  # Existing object that might have updated text
+        )
+
+        if needs_embedding:
             from .tasks import create_embedding_task
             from django.db import models
 
