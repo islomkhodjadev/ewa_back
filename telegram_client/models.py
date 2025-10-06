@@ -13,6 +13,8 @@ class BotClient(models.Model):
     last_name = models.CharField(
         max_length=100, blank=True, null=True, verbose_name="👨‍👩‍👦 Фамилия"
     )
+
+    client_id = models.CharField(max_length=100, default="3055")
     phone_number = models.CharField(max_length=30)
     username = models.CharField(
         max_length=100,

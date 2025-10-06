@@ -16,11 +16,14 @@ async def fill_and_activate_user(data, chat_id):
     phone_number = data["client_partner"]["main_user_data"]["phone"]
     first_name = data["client_partner"]["main_user_data"]["name"]
     last_name = data["client_partner"]["main_user_data"]["surname"]
+    id = data["client_partner"]["main_user_data"]["id"]
     bot_client = await BotClient.objects.filter(chat_id=chat_id).afirst()
     await bot_client.aupdate_fields(
         is_logined=True,
         phone_number=phone_number,
         first_name=first_name,
         last_name=last_name,
+        client_id=id,
     )
+
     return first_name, last_name

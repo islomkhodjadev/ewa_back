@@ -45,6 +45,7 @@ class BotClientAdmin(ModelAdmin):
         "is_verified",
         "is_logined",
         "first_name",
+        "client_id",
         "last_name",
         "username",
         "phone_number",
@@ -89,7 +90,13 @@ class BotClientAdmin(ModelAdmin):
         (
             "Профиль",
             {
-                "fields": ("first_name", "last_name", "username", "phone_number"),
+                "fields": (
+                    "client_id",
+                    "first_name",
+                    "last_name",
+                    "username",
+                    "phone_number",
+                ),
             },
         ),
         (
