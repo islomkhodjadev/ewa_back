@@ -11,20 +11,18 @@ services:
       POSTGRES_HOST: db
       BOT_TOKEN: ${BOT_TOKEN}
       BOT_HOST: ${BOT_HOST}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS},admin-helper.ewaproduct.com,localhost,127.0.0.1  # Added domains
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS},admin-helper.ewaproduct.com,localhost,127.0.0.1
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
       - db
       - redis
     deploy:
-      replicas: 2              # Reduced from 3 to 2
+      replicas: 2              # 2 backends is enough
       resources:
         limits:
-          memory: 1.5G         # Increased memory
-          cpus: "1.0"
-        reservations:
-          memory: 1G           # Add reservation to prevent OOM
+          memory: 800M         # Reduced - no model loaded
+          cpus: "0.5"
     command:
       - sh
       - -lc
@@ -34,11 +32,9 @@ services:
         exec gunicorn core.asgi:application
         -k uvicorn.workers.UvicornWorker
         --bind 0.0.0.0:8000
-        --workers 1           # Reduced from 2 to 1
-        --threads 4           # Increased threads
+        --workers 1
+        --threads 2
         --timeout 120
-        --max-requests 1000   # Prevent memory leaks
-        --max-requests-jitter 100
     volumes:
       - ./static:/app/static
       - ./media:/app/media
@@ -52,57 +48,51 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_MAX_CONNECTIONS: 100    # Reduced connections
-      shared_buffers: 1GB              # Optimize memory
-      work_mem: 64MB                   # Reduce per-query memory
+      POSTGRES_MAX_CONNECTIONS: 50      # Reduced connections
     volumes:
       - db_data:/var/lib/postgresql/data
     deploy:
       resources:
         limits:
-          memory: 3G           # Reduced from 4G
-          cpus: "1.5"
+          memory: 2G           # Enough for vector ops
+          cpus: "1.0"
 
   redis:
     image: redis:7-alpine
     container_name: ewa_redis
-    command: redis-server --maxmemory 1gb --maxmemory-policy allkeys-lru --save "" --maxclients 100
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --save ""
     volumes:
       - redis_data:/data
     deploy:
       resources:
         limits:
-          memory: 1G           # Reduced from 2G
-          cpus: "0.3"
+          memory: 512M         # Reduced
+          cpus: "0.2"
 
-  # Fast workers for E5 embeddings - optimized for 8 cores
+  # Fast workers - only 2 instances
   worker-fast:
     build: .
     command: >
       celery -A core worker
       --loglevel=INFO
       --queues=fast,default
-      --concurrency=4           # Reduced from 6
+      --concurrency=3           # Moderate concurrency
       --prefetch-multiplier=1
-      --max-tasks-per-child=50  # Reduced to prevent memory buildup
-      --autoscale=6,2          # Reduced autoscale
+      --max-tasks-per-child=50
     environment:
       - CELERY_WORKER=true
-      - CELERYD_CONCURRENCY=4
+      - CELERYD_CONCURRENCY=3
       - OMP_NUM_THREADS=1
-      - PYTHONUNBUFFERED=1
     env_file: .env
     depends_on: [redis]
     volumes:
       - .:/app
     deploy:
-      replicas: 3              # Reduced from 4 to 3
+      replicas: 2              # Only 2 workers
       resources:
         limits:
-          memory: 3G           # Increased for E5 model safety
+          memory: 3G           # Enough for E5 model
           cpus: "1.5"
-        reservations:
-          memory: 2G           # Reserve memory to prevent OOM
 
 volumes:
   db_data:
