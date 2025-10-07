@@ -49,6 +49,10 @@ def skynet_answer(user_prompt: str, session_object: ChatSession) -> str:
             {
                 "role": "system",
                 "content": f"""
+{session_object.current_role.behaviour}
+ACTIVE CHARACTER PORTRAIT START:
+{session_object.current_role.portret}
+ACTIVE CHARACTER PORTRAIT END.
 
 **Use Markdown to format your response for clarity and emphasis:**
 - Use **bold** for emphasis (e.g., **important points**).
@@ -58,10 +62,6 @@ def skynet_answer(user_prompt: str, session_object: ChatSession) -> str:
 - Use inline code (`text`) for technical terms or examples.
 - Use blockquotes (`>`) for highlighting key user questions or statements.
 
-{session_object.current_role.behaviour}
-ACTIVE CHARACTER PORTRAIT START:
-{session_object.current_role.portret}
-ACTIVE CHARACTER PORTRAIT END.
 """,
             },
             *inputs,
