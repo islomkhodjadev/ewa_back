@@ -116,7 +116,7 @@ def skynet_summarize(session_object: ChatSession) -> str:
     utils: Utils = get_utils()
     inputs = session_object.get_last_summarization_history_v2()
     logger.info(inputs)
-    if len(inputs) < 5:
+    if len(inputs) <= 10:
         return """Чтобы оценить разговор, нужно сначала немного пообщаться.
 Если хочешь снова перейти в режим тренировки, нажми кнопку в левом нижнем углу."""
     response = client_sync.responses.create(
