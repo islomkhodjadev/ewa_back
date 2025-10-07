@@ -16,10 +16,15 @@ async def get_answer_async(prompt: str) -> Optional[Dict]:
     return result
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def get_answer_sync(prompt: str, session: ChatSession) -> Optional[Dict]:
     embedding = get_embedding(prompt)
     objects = search_documents(embedding, top_k=5)
-
+    logger.info(objects)
     result = chat_gpt_function_calling.get_answer_gpt_function(prompt, objects, session)
 
     return result
