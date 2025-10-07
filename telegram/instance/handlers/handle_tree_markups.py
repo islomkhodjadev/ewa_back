@@ -358,8 +358,7 @@ async def send_full_attachment(
                         reply_markup=buttons if is_last else None,
                         parse_mode=ParseMode.HTML,
                     )
-            elif buttons:
-                await message.answer("Выберите действие:", reply_markup=buttons)
+
             return
 
         # Collect files with error handling
@@ -385,8 +384,6 @@ async def send_full_attachment(
                         reply_markup=buttons if is_last else None,
                         parse_mode=ParseMode.HTML,
                     )
-            elif buttons:
-                await message.answer("Выберите действие:", reply_markup=buttons)
             return
 
         # Start chat action (typing/uploading) in background
@@ -686,8 +683,6 @@ async def send_full_attachment(
             if chat_action_task:
                 chat_action_task.cancel()
             await message.answer("Нет доступных файлов для отправки.")
-            if buttons:
-                await message.answer("Выберите действие:", reply_markup=buttons)
             return
 
         # Send all valid files
@@ -696,10 +691,6 @@ async def send_full_attachment(
         # Stop chat action
         if chat_action_task:
             chat_action_task.cancel()
-
-        # Send buttons at the end if provided
-        if buttons:
-            await message.answer("Выберите действие:", reply_markup=buttons)
 
     except Exception as e:
         logger.error(f"Unexpected error in send_full_attachment: {e}", exc_info=True)
