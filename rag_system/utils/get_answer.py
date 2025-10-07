@@ -7,7 +7,7 @@ from miniapp.models import ChatSession
 
 async def get_answer_async(prompt: str) -> Optional[Dict]:
     embedding = await get_embedding_async(prompt)
-    objects = await search_documents_async(embedding, top_k=3)
+    objects = await search_documents_async(embedding, top_k=5)
 
     result = await chat_gpt_function_calling.get_answer_gpt_function_async(
         prompt, objects
@@ -18,7 +18,7 @@ async def get_answer_async(prompt: str) -> Optional[Dict]:
 
 def get_answer_sync(prompt: str, session: ChatSession) -> Optional[Dict]:
     embedding = get_embedding(prompt)
-    objects = search_documents(embedding, top_k=3)
+    objects = search_documents(embedding, top_k=5)
 
     result = chat_gpt_function_calling.get_answer_gpt_function(prompt, objects, session)
 

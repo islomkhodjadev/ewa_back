@@ -137,7 +137,8 @@ class NotificationsConsumer(AsyncJsonWebsocketConsumer):
                 logger.warning(
                     f"No session data found for chat_session_id: {self.chat_session_id}"
                 )
-
+                await self.close(code=4002)
+                return
         except Exception as e:
             logger.error(f"Error fetching or sending session data: {str(e)}")
             await self.close(code=4002)
