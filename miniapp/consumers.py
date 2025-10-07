@@ -83,25 +83,67 @@ class NotificationsConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         chat_id = self.scope["url_route"]["kwargs"].get("user_id")
 
+        logger.info(f"WebSocket connection attempt for user_id: {chat_id}")
+
         if not chat_id:
+            logger.warning(
+                "WebSocket connection rejected: Missing user_id in URL route"
+            )
             await self.close(code=4000)
             return
 
+        logger.debug(f"Attempting to get session IDs for chat_id: {chat_id}")
         ids = await self._ensure_session_get_ids(chat_id=chat_id)
+
         if not ids:
+            logger.error(
+                f"WebSocket connection rejected: No BotClient found for user_id: {chat_id}"
+            )
             await self.close(code=4001)  # no BotClient for this user
             return
 
         self.bot_client_id, self.chat_session_id = ids
+        logger.info(
+            f"Session IDs retrieved - bot_client_id: {self.bot_client_id}, chat_session_id: {self.chat_session_id}"
+        )
 
         self.group = f"user_{chat_id}"
-        await self.channel_layer.group_add(self.group, self.channel_name)
-        await self.accept()
+        logger.debug(f"Adding channel to group: {self.group}")
 
-        data = await self._get_session_serialized(self.chat_session_id)
+        try:
+            await self.channel_layer.group_add(self.group, self.channel_name)
+            await self.accept()
+            logger.info(
+                f"WebSocket connection accepted for user_id: {chat_id}, channel: {self.channel_name}"
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to add channel to group or accept connection: {str(e)}"
+            )
+            await self.close(code=4002)
+            return
 
-        if data:
-            await self.send_json(data)
+        logger.debug(
+            f"Fetching serialized session data for chat_session_id: {self.chat_session_id}"
+        )
+        try:
+            data = await self._get_session_serialized(self.chat_session_id)
+
+            if data:
+                logger.info(f"Sending initial session data to user_id: {chat_id}")
+                await self.send_json(data)
+                logger.debug("Initial session data sent successfully")
+            else:
+                logger.warning(
+                    f"No session data found for chat_session_id: {self.chat_session_id}"
+                )
+
+        except Exception as e:
+            logger.error(f"Error fetching or sending session data: {str(e)}")
+            await self.close(code=4002)
+            return
+            # Don't close connection here as the WebSocket is already established
+            # Just log the error and continue
 
     async def receive_json(self, content, **kwargs):
         prompt = content.get("prompt") or ""
