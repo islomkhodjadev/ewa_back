@@ -57,9 +57,11 @@ def skynet_answer(user_prompt: str, session_object: ChatSession) -> str:
 - Use numbered lists (`1.`) for ordered steps or priorities.
 - Use inline code (`text`) for technical terms or examples.
 - Use blockquotes (`>`) for highlighting key user questions or statements.
-{session_object.current_role.behaviour}
-{session_object.current_role.portret}
 
+{session_object.current_role.behaviour}
+ACTIVE CHARACTER PORTRAIT START:
+{session_object.current_role.portret}
+ACTIVE CHARACTER PORTRAIT END.
 """,
             },
             *inputs,
