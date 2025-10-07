@@ -134,10 +134,12 @@ async def use_tree(
             return
 
         children_qs = next_button.children.all()
+        has_children = await children_qs.aexists()
+        has_attachment = hasattr(next_button, "attachment")
 
         # Leaf at root: send attachment (if any) or just text, and show Back to root
-        if not await children_qs.aexists():
-            if hasattr(next_button, "attachment"):
+        if not has_children:
+            if has_attachment:
                 return await send_full_attachment(
                     message,
                     next_button.attachment,
@@ -145,6 +147,7 @@ async def use_tree(
                     buttons=back_keyboard(),
                     fallback_text=next_button.text,
                 )
+            # No attachment, just send the text with back button
             return await message.answer(
                 safe_telegram_html(next_button.text),
                 reply_markup=back_keyboard(),
@@ -160,30 +163,26 @@ async def use_tree(
             extra_buttons=[BACK_BTN],
         )
 
-        if hasattr(next_button, "attachment"):
-            await send_full_attachment(
-                message,
-                next_button.attachment,
-                bot,
-                buttons=buttons,
-                fallback_text=next_button.text,
-            )
+        # Only send the button text if there's no attachment
+        if not has_attachment:
             return await message.answer(
                 safe_telegram_html(next_button.text),
                 reply_markup=buttons,
                 parse_mode=ParseMode.HTML,
             )
 
-        return await message.answer(
-            safe_telegram_html(next_button.text),
-            reply_markup=buttons,
-            parse_mode=ParseMode.HTML,
+        # If there's an attachment, send it with the buttons - don't send button text separately
+        return await send_full_attachment(
+            message,
+            next_button.attachment,
+            bot,
+            buttons=buttons,
+            fallback_text=next_button.text,
         )
 
-    # 2) User is traversing deeper - FIXED VERSION
+    # 2) User is traversing deeper
     if session.current_button is not None:
         # Get ALL potential next buttons with this name
-        # In section 2) User is traversing deeper:
         potential_buttons = [
             button
             async for button in session.current_button.children.all()
@@ -199,7 +198,6 @@ async def use_tree(
             return
 
         # If multiple buttons with same name exist, take the first one
-        # You might want to add additional logic here if needed
         next_button = potential_buttons[0]
 
         # Additional safety check - verify parent relationship
@@ -208,10 +206,12 @@ async def use_tree(
             return
 
         children_qs = next_button.children.all()
+        has_children = await children_qs.aexists()
+        has_attachment = hasattr(next_button, "attachment")
 
         # Leaf while traversing: send attachment (if any) or text, and show Back
-        if not await children_qs.aexists():
-            if hasattr(next_button, "attachment"):
+        if not has_children:
+            if has_attachment:
                 return await send_full_attachment(
                     message,
                     next_button.attachment,
@@ -219,6 +219,7 @@ async def use_tree(
                     buttons=back_keyboard(),
                     fallback_text=next_button.text,
                 )
+            # No attachment, just send the text with back button
             return await message.answer(
                 safe_telegram_html(next_button.text),
                 reply_markup=back_keyboard(),
@@ -234,24 +235,21 @@ async def use_tree(
             extra_buttons=[BACK_BTN],
         )
 
-        if hasattr(next_button, "attachment"):
-            await send_full_attachment(
-                message,
-                next_button.attachment,
-                bot,
-                buttons=buttons,
-                fallback_text=next_button.text,
-            )
+        # Only send the button text if there's no attachment
+        if not has_attachment:
             return await message.answer(
                 safe_telegram_html(next_button.text),
                 reply_markup=buttons,
                 parse_mode=ParseMode.HTML,
             )
 
-        return await message.answer(
-            safe_telegram_html(next_button.text),
-            reply_markup=buttons,
-            parse_mode=ParseMode.HTML,
+        # If there's an attachment, send it with the buttons - don't send button text separately
+        return await send_full_attachment(
+            message,
+            next_button.attachment,
+            bot,
+            buttons=buttons,
+            fallback_text=next_button.text,
         )
 
 
