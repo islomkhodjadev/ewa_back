@@ -2,7 +2,7 @@
 from typing import Optional
 
 from aiogram import types, Bot, Router
-from aiogram.enums import ParseMode
+from aiogram.enums import ParseMode, ChatAction
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 from telegram.instance.filters.tree_filter import TreeButtonsOnly
@@ -14,6 +14,7 @@ from telegram.instance.markup_buttons import reply_markup_builder_from_model
 import logging
 import re
 import os
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +146,7 @@ async def use_tree(
                     next_button.attachment,
                     bot,
                     buttons=back_keyboard(),
-                    fallback_text=next_button.text,
+                    fallback_text=None,  # Don't send button name
                 )
             # No attachment, just send the text with back button
             return await message.answer(
@@ -177,7 +178,7 @@ async def use_tree(
             next_button.attachment,
             bot,
             buttons=buttons,
-            fallback_text=next_button.text,
+            fallback_text=None,  # Don't send button name
         )
 
     # 2) User is traversing deeper
@@ -217,7 +218,7 @@ async def use_tree(
                     next_button.attachment,
                     bot,
                     buttons=back_keyboard(),
-                    fallback_text=next_button.text,
+                    fallback_text=None,  # Don't send button name
                 )
             # No attachment, just send the text with back button
             return await message.answer(
@@ -249,7 +250,7 @@ async def use_tree(
             next_button.attachment,
             bot,
             buttons=buttons,
-            fallback_text=next_button.text,
+            fallback_text=None,  # Don't send button name
         )
 
 
@@ -294,6 +295,19 @@ PHOTO_MAX_BYTES = 10 * 1024 * 1024
 # NOTE: Photos > 10 MB cannot be sent with sendPhoto; we fallback to sendDocument.
 
 
+async def send_chat_action_periodically(chat_id: int, bot: Bot, action: ChatAction):
+    """Keep sending chat action until cancelled."""
+    while True:
+        try:
+            await bot.send_chat_action(chat_id=chat_id, action=action)
+            await asyncio.sleep(5)  # Telegram requires action every 5 seconds
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Error sending chat action: {e}")
+            break
+
+
 async def send_full_attachment(
     message: types.Message,
     attachment,  # This is AttachmentToButton instance
@@ -305,10 +319,12 @@ async def send_full_attachment(
     Sends the attachment linked to a ButtonTree node with proper text and media limits.
     Handles all edge cases including mixed media, large files, and errors.
     """
+    chat_action_task = None
+
     try:
-        # Choose base text and make it safe
+        # Choose base text and make it safe - ONLY use attachment text, never button name
         att_text = (attachment.text or "").strip()
-        base_text = att_text if att_text else (fallback_text or "")
+        base_text = att_text if att_text else ""
         base_text = safe_telegram_html(base_text.strip())
 
         def split_long_text(text: str, max_length: int = 4096) -> list[str]:
@@ -342,8 +358,8 @@ async def send_full_attachment(
                         reply_markup=buttons if is_last else None,
                         parse_mode=ParseMode.HTML,
                     )
-            # elif buttons:
-            #     await message.answer("Выберите действие:", reply_markup=buttons)
+            elif buttons:
+                await message.answer("Выберите действие:", reply_markup=buttons)
             return
 
         # Collect files with error handling
@@ -369,9 +385,28 @@ async def send_full_attachment(
                         reply_markup=buttons if is_last else None,
                         parse_mode=ParseMode.HTML,
                     )
-            # elif buttons:
-            #     await message.answer("Выберите действие:", reply_markup=buttons)
+            elif buttons:
+                await message.answer("Выберите действие:", reply_markup=buttons)
             return
+
+        # Start chat action (typing/uploading) in background
+        chat_action_task = asyncio.create_task(
+            send_chat_action_periodically(
+                chat_id=message.chat.id,
+                bot=bot,
+                action=(
+                    ChatAction.UPLOAD_DOCUMENT
+                    if any(
+                        f
+                        for f in files
+                        if not f.source.name.lower().endswith(
+                            (".jpg", ".jpeg", ".png", ".gif", ".webp")
+                        )
+                    )
+                    else ChatAction.UPLOAD_PHOTO
+                ),
+            )
+        )
 
         # Helper function to validate and prepare file
         async def prepare_file(attachment_data: AttachmentData) -> Optional[dict]:
@@ -625,6 +660,12 @@ async def send_full_attachment(
 
         text_sent_separately = False
         if base_text:
+            # Send typing action for text
+            await bot.send_chat_action(
+                chat_id=message.chat.id, action=ChatAction.TYPING
+            )
+            await asyncio.sleep(1)  # Small delay to show typing
+
             for chunk in text_chunks:
                 await message.answer(chunk, parse_mode=ParseMode.HTML)
             media_caption = None  # Don't use caption after sending text separately
@@ -642,6 +683,8 @@ async def send_full_attachment(
                 )
 
         if not valid_files:
+            if chat_action_task:
+                chat_action_task.cancel()
             await message.answer("Нет доступных файлов для отправки.")
             if buttons:
                 await message.answer("Выберите действие:", reply_markup=buttons)
@@ -650,12 +693,19 @@ async def send_full_attachment(
         # Send all valid files
         await send_media_groups_by_type(valid_files, media_caption)
 
-        # Send buttons at the end
-        # if buttons:
-        #     await message.answer("Выберите действие:", reply_markup=buttons)
+        # Stop chat action
+        if chat_action_task:
+            chat_action_task.cancel()
+
+        # Send buttons at the end if provided
+        if buttons:
+            await message.answer("Выберите действие:", reply_markup=buttons)
 
     except Exception as e:
         logger.error(f"Unexpected error in send_full_attachment: {e}", exc_info=True)
+        # Stop chat action on error
+        if chat_action_task:
+            chat_action_task.cancel()
         await message.answer("Произошла непредвиденная ошибка при отправке материалов.")
         if buttons:
             await message.answer("Выберите действие:", reply_markup=buttons)
