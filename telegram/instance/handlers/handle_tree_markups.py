@@ -79,8 +79,8 @@ async def give_parent_tree(message: types.Message, bot: Bot, from_back: bool = F
             ).aupdate(current_button=None)
 
         # When user returns from "Назад", don't show the greeting again
-        except:
-            pass
+        except Exception as e:
+            logger.info(e)
         return await message.answer("Главное меню:", reply_markup=buttons)
 
     # First entry
