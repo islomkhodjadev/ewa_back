@@ -89,7 +89,15 @@ class ButtonTreeAdmin(ModelAdmin):
 
     # This is the key - both levels nested under ButtonTree
     inlines = [AttachmentToButtonInline]
-
+    formfield_overrides = {
+        models.ForeignKey: {
+            "widget": admin.widgets.AutocompleteSelect(
+                ButtonTree._meta.get_field("parent"),
+                admin_site=admin.site,
+                attrs={"data-placeholder": "Поиск родительской кнопки..."},
+            )
+        }
+    }
     fieldsets = (
         (
             "Основная информация",
@@ -244,6 +252,15 @@ class AttachmentToButtonAdmin(ModelAdmin):
     list_filter = ("source_type",)
     search_fields = ("button__text", "text")
     inlines = [AttachmentDataInline]  # For when editing AttachmentToButton directly
+    formfield_overrides = {
+        models.OneToOneField: {
+            "widget": admin.widgets.AutocompleteSelect(
+                AttachmentToButton._meta.get_field("button"),
+                admin_site=admin.site,
+                attrs={"data-placeholder": "Поиск кнопки..."},
+            )
+        }
+    }
 
     def data_count(self, obj):
         return obj.data.count()
