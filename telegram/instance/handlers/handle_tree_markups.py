@@ -74,7 +74,7 @@ async def give_parent_tree(message: types.Message, bot: Bot, from_back: bool = F
 
     if from_back:
         try:
-            client_session = BotClientSession.objects.filter(
+            client_session = await BotClientSession.objects.filter(
                 client__chat_id=message.from_user.id
             ).aupdate(current_button=None)
 
