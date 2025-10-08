@@ -61,6 +61,7 @@ def back_keyboard() -> ReplyKeyboardMarkup:
 async def give_parent_tree(message: types.Message, bot: Bot, from_back: bool = False):
     logger.info("HERE IN GIVE TREE START")
     buttons_tree = ButtonTree.objects.filter(parent=None)
+
     buttons = await reply_markup_builder_from_model(
         buttons_tree,
         extra_buttons=[
@@ -72,7 +73,14 @@ async def give_parent_tree(message: types.Message, bot: Bot, from_back: bool = F
     )
 
     if from_back:
+        try:
+            client_session = BotClientSession.objects.filter(
+                client__chat_id=message.from_user.id
+            ).aupdate(current_button=None)
+
         # When user returns from "Назад", don't show the greeting again
+        except:
+            pass
         return await message.answer("Главное меню:", reply_markup=buttons)
 
     # First entry
